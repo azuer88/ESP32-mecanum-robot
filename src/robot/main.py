@@ -12,29 +12,27 @@ from dcmotor import DCMotor
 from config import main_config, start_webrepl
 from lib.mecanum import MecanumDrive
 
-# --- Board-specific configuration ---
-# Replace with the MAC address of the OTHER board
-# PEER_MAC_ADDRESS_STR = "30:ae:a4:f6:7d:4c" # Example MAC
 PEER_MAC_ADDRESS_STR = main_config.get('peer_mac_address', '00:00:00:00:00:00')
 PEER_MAC_ADDRESS = ubinascii.unhexlify(PEER_MAC_ADDRESS_STR.replace(":", ""))
 
+if PEER_MAC_ADDRESS_STR == '00:00:00:00:00:00':
+    print("WARNING: peer_mac_address not set in config.json — ESP-NOW will fail")
+
 WIFI_CHANNEL = 11  # All devices must be on the same channel
 
-# --- Button and event setup ---
-# The boot button is connected to GPIO0 on most ESP32 boards.
 boot_button_pin = Pin(0, Pin.IN, Pin.PULL_UP)
 stop_event = asyncio.Event()
 led = Pin(2, Pin.OUT)
-# action event to monitor activity
 action_event = asyncio.Event()
 
 main_queue = queue.Queue(10)
-# main_queue = asyncio.Queue(10)
 
 mecanum = MecanumDrive()
 mecanum.load_cfg()
 
 TIMEOUT_S = 10  # 10 seconds
+
+_DRIVE_KEYS = {'throttle', 'strafe', 'rotate'}
 
 
 # --- Setup Wi-Fi and ESP-NOW ---
@@ -97,6 +95,9 @@ async def receive_messages(espnow: aioespnow.AIOESPNOW):
                 except ValueError as e:
                     print(f"error decoding json - {decoded_mesg}: {e!r}")
                     continue
+                if not isinstance(data, dict) or not _DRIVE_KEYS.issubset(data):
+                    print(f"unexpected message structure, ignoring: {data}")
+                    continue
                 # noinspection PyUnresolvedReferences
                 await main_queue.put(data)
 
@@ -128,7 +129,12 @@ async def handle_task():
 
 
 async def main():
-    esp_now_instance = setup_espnow()
+    try:
+        esp_now_instance = setup_espnow()
+    except OSError as err:
+        print(f"Fatal: could not initialize ESP-NOW: {err}")
+        return
+
     tasks = [
         asyncio.create_task(monitor_button()),
         asyncio.create_task(monitor_activity()),
@@ -144,8 +150,6 @@ async def main():
     await asyncio.gather(*tasks, return_exceptions=True)
     esp_now_instance.active(False)
 
-    # Exit Cleanly
-    # sys.exit()
 
 if __name__ == "__main__":
     try:

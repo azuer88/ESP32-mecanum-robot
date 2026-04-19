@@ -1,3 +1,5 @@
 **/config.json
+**/webrepl_cfg.py
 .idea/
 npm-debug.log
+.wezterm-startup
