@@ -20,7 +20,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKEL_DIR="${SCRIPT_DIR}/skel"
-FIRMWARE="${SCRIPT_DIR}/ESP32_GENERIC-20250911-v1.26.1.bin"
+FIRMWARE="$(ls -t "${SCRIPT_DIR}"/*.bin 2>/dev/null | head -1)"
 PROGRAM=0
 DEBUG=0
 
