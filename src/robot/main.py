@@ -33,6 +33,8 @@ mecanum.load_cfg()
 TIMEOUT_S = 10  # 10 seconds
 
 _DRIVE_KEYS = {'throttle', 'strafe', 'rotate'}
+# Latest joystick command; overwritten on each live message, read by control_loop
+_current_cmd = {"throttle": 0.0, "strafe": 0.0, "rotate": 0.0}
 
 
 # --- Setup Wi-Fi and ESP-NOW ---
@@ -71,13 +73,12 @@ async def monitor_button():
 
 
 async def receive_messages(espnow: aioespnow.AIOESPNOW):
-    """Listens for and processes incoming messages until stop_event is set."""
+    """Listens for incoming messages and routes them to queue or live register."""
     print("Starting receiving messages")
     try:
         while not stop_event.is_set():
             mac, msg = await espnow.airecv()
             if mac is None:
-                # Timed out awaiting for message, check stop_event again
                 # noinspection PyUnresolvedReferences
                 await asyncio.sleep_ms(50)
                 continue
@@ -89,17 +90,24 @@ async def receive_messages(espnow: aioespnow.AIOESPNOW):
             print(f"Received from {sender_mac}: {decoded_mesg}")
             if decoded_mesg == "BYE":
                 stop_event.set()
-            else:
-                try:
-                    data = json.loads(decoded_mesg)
-                except ValueError as e:
-                    print(f"error decoding json - {decoded_mesg}: {e!r}")
-                    continue
-                if not isinstance(data, dict) or not _DRIVE_KEYS.issubset(data):
-                    print(f"unexpected message structure, ignoring: {data}")
-                    continue
+                continue
+
+            try:
+                data = json.loads(decoded_mesg)
+            except ValueError as e:
+                print(f"error decoding json - {decoded_mesg}: {e!r}")
+                continue
+
+            if not isinstance(data, dict) or not _DRIVE_KEYS.issubset(data):
+                print(f"unexpected message structure, ignoring: {data}")
+                continue
+
+            cmd = {k: data[k] for k in _DRIVE_KEYS}
+            if data.get("queued"):
                 # noinspection PyUnresolvedReferences
-                await main_queue.put(data)
+                await main_queue.put(cmd)
+            else:
+                _current_cmd.update(cmd)
 
     except OSError as err:
         print(f"Failed to receive messages: {err!r}")
@@ -109,19 +117,28 @@ async def receive_messages(espnow: aioespnow.AIOESPNOW):
 
 async def monitor_activity():
     while True:
-        action_event.clear()  # clear the event for the next cycle
+        action_event.clear()
         try:
             print(f"waiting for activity timeout in {TIMEOUT_S} seconds...")
             await asyncio.wait_for(action_event.wait(), TIMEOUT_S)
-            # this code runs only if the event was set (activity detected)
             print("Activity detected! Continue to wait.")
         except asyncio.TimeoutError:
-            # This code runs only if the timeout was reached
             print("Activity timed out! turning off mecanum drive.")
+            _current_cmd.update({"throttle": 0.0, "strafe": 0.0, "rotate": 0.0})
             mecanum.stop()
 
 
+async def control_loop():
+    """Applies live joystick commands at a fixed rate when no scripted queue is active."""
+    while not stop_event.is_set():
+        if main_queue.empty():
+            mecanum.drive(**_current_cmd)
+        # noinspection PyUnresolvedReferences
+        await asyncio.sleep_ms(20)  # 50 Hz
+
+
 async def handle_task():
+    """Processes scripted commands from the FIFO queue; takes priority over live control."""
     while True:
         item = await main_queue.get()
         print(f"command: ({type(item)}) - {item}")
@@ -138,6 +155,7 @@ async def main():
     tasks = [
         asyncio.create_task(monitor_button()),
         asyncio.create_task(monitor_activity()),
+        asyncio.create_task(control_loop()),
         asyncio.create_task(handle_task()),
         asyncio.create_task(receive_messages(esp_now_instance))
     ]
