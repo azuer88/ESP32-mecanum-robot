@@ -151,9 +151,37 @@ These steps prepare a freshly flashed MicroPython board before deploying the pro
 
 ### 1. Install mpremote
 
-```bash
-pip install mpremote
+The current stable release is **mpremote 1.28.0**. It is recommended to install it inside a virtual environment to avoid conflicts with system packages.
+
+**Windows** — Python 3.12 is recommended. Download from [python.org](https://www.python.org/downloads/windows/).
+
+```bat
+python -m venv venv
+venv\Scripts\activate
+pip install mpremote==1.28.0
 ```
+
+**Linux / macOS**
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install mpremote==1.28.0
+```
+
+**Debian / Ubuntu** — the system Python is often too old. Install Python 3.12 via the `deadsnakes` PPA:
+
+```bash
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt update
+sudo apt install python3.12 python3.12-venv
+
+python3.12 -m venv venv
+source venv/bin/activate
+pip install mpremote==1.28.0
+```
+
+Activate the virtual environment each time before using `mpremote`.
 
 ### 2. Set the WebREPL password
 
