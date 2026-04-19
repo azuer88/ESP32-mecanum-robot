@@ -80,8 +80,8 @@ if [[ ! -f "${SKEL_DIR}/webrepl_cfg.py" ]]; then
 fi
 
 if [[ $PROGRAM -gt 0 ]]; then
-    if ! command -v esptool.py &>/dev/null; then
-        echo "ERROR: esptool.py not found. Install with: pip install esptool"
+    if ! command -v esptool &>/dev/null; then
+        echo "ERROR: esptool not found. Install with: pip install esptool"
         exit 1
     fi
     if [[ -z "${FIRMWARE}" ]]; then
@@ -118,9 +118,9 @@ if [[ $PROGRAM -gt 0 ]]; then
     read -p "Press Enter to proceed (Ctrl+C to abort)..." -r
 
     # shellcheck disable=SC2086
-    esptool.py ${PORT_FLAG} erase_flash
+    esptool ${PORT_FLAG} erase_flash
     # shellcheck disable=SC2086
-    esptool.py ${PORT_FLAG} --baud 460800 write_flash 0x1000 "${FIRMWARE}"
+    esptool ${PORT_FLAG} --baud 460800 write-flash 0x1000 "${FIRMWARE}"
 
     echo "Waiting for device to reboot..."
     sleep 10
