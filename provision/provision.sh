@@ -2,10 +2,12 @@
 # Provision an ESP32 with baseline MicroPython firmware and skeleton scripts.
 #
 # Usage:
-#   ./provision.sh [-p | --program] [-d | --debug]
+#   ./provision.sh [-p | --program] [-u | --usb PORT] [-d | --debug]
 #
-#   -p | --program  Erase flash and write MicroPython firmware before deploying files
-#   -d | --debug    Enable bash -x tracing and exit-on-error
+#   -p | --program       Erase flash and write MicroPython firmware before deploying files
+#   -u | --usb PORT      Serial port to use (e.g. /dev/ttyUSB1). If omitted, esptool
+#                        auto-detects — unreliable when multiple USB devices are connected.
+#   -d | --debug         Enable bash -x tracing and exit-on-error
 #
 # Dependencies:
 #   mpremote   pip install mpremote
@@ -23,6 +25,7 @@ SKEL_DIR="${SCRIPT_DIR}/skel"
 FIRMWARE="$(ls -t "${SCRIPT_DIR}"/*.bin 2>/dev/null | head -1)"
 PROGRAM=0
 DEBUG=0
+USB_PORT=""
 
 while [[ "$#" -gt 0 ]]; do
     case "$1" in
@@ -30,14 +33,23 @@ while [[ "$#" -gt 0 ]]; do
             PROGRAM=1
             shift
             ;;
+        -u|--usb)
+            if [[ -z "$2" || "$2" == -* ]]; then
+                echo "ERROR: --usb requires a port argument (e.g. --usb /dev/ttyUSB1)"
+                exit 1
+            fi
+            USB_PORT="$2"
+            shift 2
+            ;;
         -d|--debug)
             DEBUG=1
             shift
             ;;
         *)
-            echo "USAGE: $0 [-p | --program] [-d | --debug]"
-            echo "  -p | --program  Flash MicroPython firmware before deploying"
-            echo "  -d | --debug    Enable bash -x tracing"
+            echo "USAGE: $0 [-p | --program] [-u | --usb PORT] [-d | --debug]"
+            echo "  -p | --program       Flash MicroPython firmware before deploying"
+            echo "  -u | --usb PORT      Serial port (e.g. /dev/ttyUSB1, /dev/ttyACM0)"
+            echo "  -d | --debug         Enable bash -x tracing"
             exit 1
             ;;
     esac
@@ -88,11 +100,27 @@ if [[ $PROGRAM -gt 0 ]]; then
         exit 1
     fi
 
+    # Build port flag; warn if not specified and multiple USB devices are present
+    PORT_FLAG=""
+    if [[ -n "${USB_PORT}" ]]; then
+        PORT_FLAG="--port ${USB_PORT}"
+    else
+        USB_COUNT=$(ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null | wc -l)
+        if [[ $USB_COUNT -gt 1 ]]; then
+            echo "WARNING: ${USB_COUNT} USB serial devices detected and no --usb port specified."
+            echo "  esptool may target the wrong device. Use -u to select one explicitly."
+            echo "  Available ports: $(ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null | tr '\n' ' ')"
+        fi
+    fi
+
     echo "Flashing MicroPython to device: $(basename "${FIRMWARE}")"
+    [[ -n "${USB_PORT}" ]] && echo "  Port: ${USB_PORT}"
     read -p "Press Enter to proceed (Ctrl+C to abort)..." -r
 
-    esptool.py erase_flash
-    esptool.py --baud 460800 write_flash 0x1000 "${FIRMWARE}"
+    # shellcheck disable=SC2086
+    esptool.py ${PORT_FLAG} erase_flash
+    # shellcheck disable=SC2086
+    esptool.py ${PORT_FLAG} --baud 460800 write_flash 0x1000 "${FIRMWARE}"
 
     echo "Waiting for device to reboot..."
     sleep 10
