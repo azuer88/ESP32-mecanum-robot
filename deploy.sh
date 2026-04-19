@@ -97,7 +97,7 @@ echo "Deploying ${BOARD} firmware..."
 [[ -n "${USB_PORT}" ]] && echo "  Port: ${USB_PORT}"
 
 pushd "${SHARED_DIR}" > /dev/null
-${MPREMOTE} resume cp boot.py config.py :/ + cp -r lib :/
+${MPREMOTE} resume cp *.py :/ + cp -r lib :/
 popd > /dev/null
 
 pushd "${BOARD_DIR}" > /dev/null

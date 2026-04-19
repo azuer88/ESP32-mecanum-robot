@@ -1,13 +1,10 @@
 import math
 import json
-import network
-# noinspection PyUnresolvedReferences
-import aioespnow
-import ubinascii
 
 import uasyncio as asyncio
 from machine import Pin, ADC
 from config import main_config, start_webrepl
+from radio import PEER_MAC_ADDRESS, setup_espnow, monitor_button
 
 X_DEADZONE = (30450, 33950)
 Y_DEADZONE = (28660, 33000)
@@ -20,14 +17,6 @@ X_MODE = False  # True - strafe mode, False - rotate mode
 state_event = asyncio.Event()
 mode_lock = asyncio.Lock()
 stop_event = asyncio.Event()
-
-PEER_MAC_ADDRESS_STR = main_config.get('peer_mac_address', '00:00:00:00:00:00')
-PEER_MAC_ADDRESS = ubinascii.unhexlify(PEER_MAC_ADDRESS_STR.replace(':', ''))
-
-if PEER_MAC_ADDRESS_STR == '00:00:00:00:00:00':
-    print("WARNING: peer_mac_address not set in config.json — ESP-NOW will fail")
-
-WIFI_CHANNEL = 11
 
 
 # ADC reader with exponential moving average smoothing and button-press detection.
@@ -113,20 +102,6 @@ def normalize_value(value, amin, amax, dmin, dmax):
             return q
 
 
-# Poll the boot button (GPIO0); set stop_event when pressed to trigger shutdown.
-async def monitor_button(button_pin=0):
-    print("Monitoring boot button...")
-    boot_button_pin = Pin(button_pin, Pin.IN, Pin.PULL_UP)
-    while True:
-        if boot_button_pin.value() == 0:
-            print("Boot button pressed, setting stop event.")
-            stop_event.set()
-            break
-        # noinspection PyUnresolvedReferences
-        await asyncio.sleep_ms(50)  # debounce and yield to other tasks
-    print("Monitoring button stopped.")
-
-
 # Blink the LED to indicate current drive mode:
 #   short on / long off  ->  rotate mode (X_MODE=False)
 #   50/50 duty           ->  strafe mode (X_MODE=True)
@@ -155,7 +130,7 @@ async def blink_led(led_pin=2, delay_ms=250):
 # Read joystick axes at 100 Hz, normalize, and transmit drive commands over
 # ESP-NOW. Only sends when the value changes by more than th_delta to avoid
 # flooding the receiver. Dynamically tracks min/max to calibrate the range.
-async def read_joystick_task(e: aioespnow.AIOESPNow, x_adc: DebouncedADC, y_adc: DebouncedADC):
+async def read_joystick_task(e, x_adc, y_adc):
     global X_MODE
 
     print("Starting joystick reader task...")
@@ -224,27 +199,6 @@ async def read_joystick_task(e: aioespnow.AIOESPNow, x_adc: DebouncedADC, y_adc:
         await asyncio.sleep_ms(10)  # Read every 10 milliseconds
 
 
-# Initialise the Wi-Fi interface in station mode and set up ESP-NOW.
-# Raises OSError if ESP-NOW cannot be activated or the peer cannot be added.
-def setup_espnow():
-    sta = network.WLAN(network.STA_IF)
-    sta.active(False)  # ensure it is disabled
-    sta.active(True)
-    # noinspection PyUnresolvedReferences
-    sta.config(channel=WIFI_CHANNEL, pm=sta.PM_NONE)
-    sta.disconnect()
-    e = aioespnow.AIOESPNow()
-    try:
-        e.config(rxbuf=1024, timeout_ms=50)
-        e.active(True)
-        e.add_peer(PEER_MAC_ADDRESS)
-        print(f"ESP-NOW initialized. Peer added: {PEER_MAC_ADDRESS_STR}")
-    except OSError as err:
-        print(f"Failed to initialize ESP-NOW: {err}")
-        raise
-    return e
-
-
 # Start ESP-NOW and launch all async tasks; wait for stop_event then clean up.
 async def main():
     print("Main program starting...")
@@ -259,7 +213,7 @@ async def main():
     tasks = [
         asyncio.create_task(read_joystick_task(esp_now_instance, x_adc, y_adc)),
         asyncio.create_task(blink_led()),
-        asyncio.create_task(monitor_button()),
+        asyncio.create_task(monitor_button(stop_event)),
     ]
 
     await stop_event.wait()
