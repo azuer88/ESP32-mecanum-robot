@@ -9,7 +9,7 @@ MicroPython firmware for an ESP32-based mecanum wheel robot controlled via ESP-N
 
 ### Robot
 - ESP32 dev board
-- TB6612FNG dual motor driver ×2 (or MX1508 ×4)
+- TB6612FNG dual motor driver ×2 (or MX1508 ×2)
 - Four DC motors with mecanum wheels
 - Built-in LED on GPIO2
 - **BOOT button** (GPIO0) — used by the firmware as emergency stop
