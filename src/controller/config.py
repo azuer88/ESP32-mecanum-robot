@@ -63,31 +63,41 @@ def do_connect():
     import time
 
 
+    TERMINAL_STATUSES = {
+        network.STAT_WRONG_PASSWORD: "wrong password",
+        network.STAT_NO_AP_FOUND: "SSID not found",
+        network.STAT_CONNECT_FAIL: "connection failed",
+    }
+
     ssid = main_config.get("wifi_ssid")
     key = main_config.get("wifi_key")
-  
-    if ssid:
-        sta_if = network.WLAN(network.STA_IF)
-        if not sta_if.isconnected():
-            print('connecting to network...')
-            sta_if.active(True)
-            # sta_if.connect('<ssid>', '<key>')
 
-            print("wifi ssid: {}".format(ssid))
-            sta_if.connect(ssid, key)
-            count = 60
-            while not sta_if.isconnected():
-                time.sleep(5)
-                count = count - 1
-                if count <= 0:
-                    break
+    if not ssid or not key:
+        print("WiFi credentials missing in config.json — skipping connection.")
+        return
 
-        if sta_if.isconnected:
-            network_config = sta_if.ifconfig()
-            print('network config:', sta_if.ifconfig())
-            # del main_config["wifi_key"]
-        else:
-            print('network config failed.')
+    sta_if = network.WLAN(network.STA_IF)
+    if not sta_if.isconnected():
+        print(f"Connecting to '{ssid}'...")
+        sta_if.active(True)
+        sta_if.connect(ssid, key)
+        count = 10
+        while not sta_if.isconnected():
+            time.sleep(5)
+            status = sta_if.status()
+            if status in TERMINAL_STATUSES:
+                print(f"WiFi error: {TERMINAL_STATUSES[status]} (status={status})")
+                break
+            count -= 1
+            if count <= 0:
+                print("WiFi error: connection timed out")
+                break
+
+    if sta_if.isconnected():
+        network_config = sta_if.ifconfig()
+        print('network config:', sta_if.ifconfig())
+    else:
+        print('network config failed — continuing without WiFi.')
 
 def start_webrepl(reload_config=False):
     if reload_config:

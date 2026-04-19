@@ -54,6 +54,7 @@ class DebouncedADC:
         self.alpha = alpha
         self.num_samples = num_samples
         self.button_pressed = False
+        self._last_value = None
 
     def read(self):
         self.button_pressed = False
@@ -61,10 +62,12 @@ class DebouncedADC:
         if 65535 in samples:
             self.button_pressed = True
             state_event.set()
-            # await asyncio.sleep_ms(200)
             return 65535
         new_value = sum(samples) // self.num_samples
-        value = self.alpha * new_value + (1 - self.alpha) * new_value
+        if self._last_value is None:
+            self._last_value = new_value
+        value = self.alpha * new_value + (1 - self.alpha) * self._last_value
+        self._last_value = value
         return value
 
 
@@ -151,7 +154,7 @@ async def monitor_button(button_pin=0):
     boot_button_pin = Pin(button_pin, Pin.IN, Pin.PULL_UP)
     while True:
         if boot_button_pin.value() == 0:
-            print("Button button pressed, setting stop event.")
+            print("Boot button pressed, setting stop event.")
             stop_event.set()
             break
         # noinspection PyUnresolvedReferences
@@ -231,17 +234,14 @@ async def read_joystick_task(e: aioespnow.AIOESPNow, x_adc: DebouncedADC, y_adc:
         if (x == 0.0 and y == 0.0) and (x != last_x or y != last_y):
             xdelta = TRUNC_VALUE
 
+        if skip:
+            skip -= 1
+            await asyncio.sleep_ms(10)
+            continue
+
         if (xdelta > th_delta) or (ydelta > th_delta):
             last_x = x
             last_y = y
-            # Print the values, waiting a short time to yield control.
-            if skip:
-                print("Ignore these:")
-
-            # debounce switch
-            # mode = "rotate"  # default False = rotate
-            # if time.ticks_diff(time.ticks_ms(), start_ms) >= 100:
-            #     start_ms = time.ticks_ms()
             async with mode_lock:
                 if X_MODE:
                     mode = "strafe"
@@ -264,9 +264,6 @@ async def read_joystick_task(e: aioespnow.AIOESPNow, x_adc: DebouncedADC, y_adc:
                 print(f"Sent: {msg}")
             else:
                 print(f"Failed to send data: {msg}")
-            print(f"data: {data}")
-        elif skip:
-            skip -= 1
         await asyncio.sleep_ms(10)  # Read every 10 milliseconds
 
 
@@ -315,7 +312,7 @@ async def main():
 
     for task in tasks:
         task.cancel()
-
+    await asyncio.gather(*tasks, return_exceptions=True)
     esp_now_instance.active(False)
 
 
