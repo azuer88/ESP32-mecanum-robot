@@ -34,14 +34,14 @@ Choose the path that matches your boards:
 
 1. [Install tools](#1-install-tools) (mpremote + esptool)
 2. [Provision each board](#provisioning-bare-boards) with `provision.sh`
-3. [Pair and deploy](#pairing-and-deploying-setupsh) with `./setup.sh`
+3. [Pair and deploy](#pairing-and-deploying) with `./setup.sh`
 
 ### Path B — Boards already running MicroPython
 
 > **Connection:** USB required for `setup.sh`. After that, config edits can be done over WiFi/WebREPL without a cable — press the BOOT button first to exit the firmware and re-enable WebREPL.
 
 1. [Install mpremote](#1-install-tools)
-2. [Pair and deploy](#pairing-and-deploying-setupsh) with `./setup.sh`
+2. [Pair and deploy](#pairing-and-deploying) with `./setup.sh`
 
 ### Path C — Manual deploy (no setup.sh)
 
@@ -113,11 +113,11 @@ Activate the virtual environment each time before using `mpremote`.
 
 ## Provisioning Bare Boards
 
-> Skip this section if your boards already have MicroPython — go straight to [Pairing and Deploying](#pairing-and-deploying-setupsh).
+> Skip this section if your boards already have MicroPython — go straight to [Pairing and Deploying](#pairing-and-deploying).
 
 `provision/provision.sh` prepares a bare ESP32: it optionally flashes MicroPython, then deploys a minimal baseline (`boot.py`, `config.py`, `config.json`, `webrepl_cfg.py`, `lib/`) that gives you a working WebREPL and the config helpers.
 
-**This is not the project firmware.** After provisioning, continue to [Pairing and Deploying](#pairing-and-deploying-setupsh).
+**This is not the project firmware.** After provisioning, continue to [Pairing and Deploying](#pairing-and-deploying).
 
 ### 1. Prepare skeleton files
 
@@ -174,7 +174,7 @@ After provisioning both boards, continue to the next section.
 
 ---
 
-## Pairing and Deploying (setup.sh / setup.bat)
+## Pairing and Deploying
 
 `setup.sh` (Linux/macOS) and `setup.bat` (Windows) are an interactive wizard that configures both boards end-to-end:
 
