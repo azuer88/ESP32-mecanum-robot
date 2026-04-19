@@ -35,7 +35,7 @@ class Queue:
         self._evget.clear()
         return self._queue.pop(0)
 
-    async def get(self):  #  Usage: item = await queue.get()
+    async def get(self):  # Usage: item = await queue.get()
         while self.empty():  # May be multiple tasks waiting on get()
             # Queue is empty, suspend task until a put occurs
             # 1st of N tasks gets, the rest loop again
@@ -75,7 +75,7 @@ class Queue:
     def full(self):  # Return True if there are maxsize items in the queue.
         # Note: if the Queue was initialized with maxsize=0 (the default) or
         # any negative number, then full() is never True.
-        return self.maxsize > 0 and self.qsize() >= self.maxsize
+        return 0 < self.maxsize <= self.qsize()
 
     def _upd_jnevt(self, inc: int):  # #Update join count and join event
         self._jncnt += inc
