@@ -72,8 +72,19 @@ if [[ $PROGRAM -gt 0 ]]; then
         echo "ERROR: esptool.py not found. Install with: pip install esptool"
         exit 1
     fi
-    if [[ ! -f "${FIRMWARE}" ]]; then
-        echo "ERROR: firmware not found: ${FIRMWARE}"
+    if [[ -z "${FIRMWARE}" ]]; then
+        echo "ERROR: no *.bin firmware file found in ${SCRIPT_DIR}"
+        echo ""
+        echo "  Download the correct MicroPython firmware for your ESP32 variant from:"
+        echo "    https://micropython.org/download/ESP32_GENERIC/"
+        echo ""
+        echo "  Common variants:"
+        echo "    ESP32_GENERIC          — standard ESP32 (most dev boards)"
+        echo "    ESP32_GENERIC_S2       — ESP32-S2"
+        echo "    ESP32_GENERIC_S3       — ESP32-S3"
+        echo "    ESP32_GENERIC_C3       — ESP32-C3"
+        echo ""
+        echo "  Place the downloaded .bin file in: ${SCRIPT_DIR}"
         exit 1
     fi
 
