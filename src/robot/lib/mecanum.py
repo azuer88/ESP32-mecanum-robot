@@ -3,18 +3,12 @@ import json
 from dcmotor import DCMotor
 
 
+# Mecanum wheel drive controller.
+# Computes per-wheel power from throttle/strafe/rotate inputs and delegates
+# to four DCMotor instances (fl, fr, rl, rr). Motors are loaded from
+# mecanum.json via load_cfg() or configured programmatically via setup_motors().
+# input_scale: multiplier applied to all inputs; default 0.5 gives a mid-range ceiling.
 class MecanumDrive:
-    """Mecanum wheel drive controller.
-
-    Computes per-wheel power from throttle/strafe/rotate inputs and delegates
-    to four DCMotor instances (fl, fr, rl, rr). Motors are loaded from
-    mecanum.json via load_cfg() or configured programmatically via setup_motors().
-
-    Args:
-        input_scale: Multiplier applied to all inputs before computing wheel
-            speeds. Values below 1.0 limit max power; default 0.5 gives a
-            comfortable mid-range ceiling.
-    """
 
     _MOTOR_KEYS = ('fl', 'fr', 'rl', 'rr')
 
@@ -26,22 +20,18 @@ class MecanumDrive:
         self.input_scale = input_scale
         self._motors = (None, None, None, None)
 
+    # Instantiate motors from a config dict keyed by position (fl/fr/rl/rr).
+    # Each value is passed as kwargs to DCMotor, which selects TB6612FNG or
+    # MX1508 based on the keys present.
     def setup_motors(self, cfg: dict):
-        """Instantiate motors from a config dict keyed by position (fl/fr/rl/rr).
-
-        Each value is passed as kwargs to DCMotor, which selects TB6612FNG or
-        MX1508 based on the keys present.
-        """
         for key in self._MOTOR_KEYS:
             if key in cfg:
                 setattr(self, key, DCMotor(**cfg[key]))
         self._motors = (self.fl, self.fr, self.rl, self.rr)
 
+    # Load motor configuration from a JSON file and call setup_motors().
+    # Returns True on success, False if the file is missing or unreadable.
     def load_cfg(self, path='mecanum.json') -> bool:
-        """Load motor configuration from a JSON file and call setup_motors().
-
-        Returns True on success, False if the file is missing or unreadable.
-        """
         try:
             with open(path) as f:
                 data = json.load(f)
@@ -51,29 +41,24 @@ class MecanumDrive:
         self.setup_motors(data)
         return True
 
+    # Return True if all four motors have been initialised.
     def _motors_ready(self) -> bool:
-        """Return True if all four motors have been initialised."""
         return all(m is not None for m in self._motors)
 
+    # Stop all motors that have been initialised.
     def stop(self):
-        """Stop all motors that have been initialised."""
         for motor in self._motors:
             if motor is not None:
                 motor.stop()
 
+    # Drive the mecanum platform.
+    # Inputs are clamped to -1..1 then scaled by input_scale before computing
+    # individual wheel speeds using standard mecanum kinematics. If any wheel
+    # exceeds 1.0 all speeds are normalised proportionally.
+    # throttle: forward/reverse (-1.0 = full reverse, 1.0 = full forward)
+    # strafe:   left/right      (-1.0 = full left,    1.0 = full right)
+    # rotate:   rotation        (-1.0 = full CCW,      1.0 = full CW)
     def drive(self, throttle: float, strafe: float, rotate: float):
-        """Drive the mecanum platform.
-
-        Inputs are clamped to -1..1 then scaled by input_scale before computing
-        individual wheel speeds using standard mecanum kinematics. If the
-        combined speed of any wheel exceeds 1.0 all wheels are normalised
-        proportionally so the ratio is preserved.
-
-        Args:
-            throttle: Forward/reverse (-1.0 = full reverse, 1.0 = full forward).
-            strafe:   Left/right translation (-1.0 = full left, 1.0 = full right).
-            rotate:   Rotation (-1.0 = full CCW, 1.0 = full CW).
-        """
         throttle = max(-1.0, min(1.0, float(throttle)))
         strafe = max(-1.0, min(1.0, float(strafe)))
         rotate = max(-1.0, min(1.0, float(rotate)))
@@ -104,15 +89,13 @@ class MecanumDrive:
         self.rl.drive(rl)
         self.rr.drive(rr)
 
+    # Return a dict of motor configs suitable for serialisation to mecanum.json.
+    # Raises RuntimeError if any motor has not been initialised.
     def asdict(self) -> dict:
-        """Return a dict of motor configs suitable for serialisation to mecanum.json.
-
-        Raises RuntimeError if any motor has not been initialised.
-        """
         if not self._motors_ready():
             raise RuntimeError("Motors not fully initialized")
         return {k: m.asdict() for k, m in zip(self._MOTOR_KEYS, self._motors)}
 
+    # Serialise the motor configuration to a JSON string.
     def json(self) -> str:
-        """Serialise the motor configuration to a JSON string."""
         return json.dumps(self.asdict())
