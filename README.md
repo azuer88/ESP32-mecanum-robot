@@ -47,13 +47,21 @@ Choose the path that matches your boards:
 
 > **Connection:** USB required. `mpremote` interrupts the running firmware automatically — no need to press BOOT.
 
-The boards are paired and working but you don't have the local config files (e.g. on a new machine). `recover.sh` reads `config.json` back from each board, detects the board type automatically, and reconstructs `src/wifi.json` and the board-specific `config.json`.
+The boards are paired and working but you don't have the local config files (e.g. on a new machine). `recover.sh` / `recover.bat` reads `config.json` back from each board, detects the board type automatically, and reconstructs `src/wifi.json` and the board-specific `config.json`.
+
+**Linux / macOS**
 
 ```bash
 ./recover.sh
 ```
 
-After recovery, use `deploy.sh` normally.
+**Windows**
+
+```bat
+recover.bat
+```
+
+After recovery, use `deploy.sh` / `deploy.bat` normally.
 
 ### Path C — Manual deploy (no setup.sh)
 
@@ -164,17 +172,25 @@ After provisioning both boards, continue to the next section.
 
 ---
 
-## Pairing and Deploying (setup.sh)
+## Pairing and Deploying (setup.sh / setup.bat)
 
-`setup.sh` is an interactive wizard that configures both boards end-to-end:
+`setup.sh` (Linux/macOS) and `setup.bat` (Windows) are an interactive wizard that configures both boards end-to-end:
 
 1. Collects WiFi credentials and saves them to `src/wifi.json`
 2. Connects to the first board, reads its MAC address, deploys firmware
 3. Connects to the second board, reads its MAC address, deploys firmware with the first board's MAC as peer
 4. Reconnects to the first board and pushes an updated config with the second board's MAC
 
+**Linux / macOS**
+
 ```bash
 ./setup.sh
+```
+
+**Windows**
+
+```bat
+setup.bat
 ```
 
 The script auto-detects the USB port. If multiple devices are connected, it lists them and asks which to use.

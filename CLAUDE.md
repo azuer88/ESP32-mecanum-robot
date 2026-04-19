@@ -20,7 +20,12 @@ Use the virtualenv at `/home/lou/.virtualenvs/micropython2` for `mpremote`.
 
 ```bash
 # First time: pair both boards end-to-end (handles MACs, WiFi, deploy)
-./setup.sh
+./setup.sh          # Linux/macOS
+# setup.bat         # Windows
+
+# Recover local config files from boards already deployed (e.g. on a new machine)
+./recover.sh        # Linux/macOS
+# recover.bat       # Windows
 
 # Deploy robot firmware
 ./deploy.sh robot
