@@ -1,9 +1,0 @@
-TB6612FNG     ESP32
-(MODULE1)
-PWMA      -->  32
-AIN1      -->  33
-AIN2      -->  25
-STBY      -->  26
-BIN1      -->  27
-BIN2      -->  14
-PWMB      -->  12 
