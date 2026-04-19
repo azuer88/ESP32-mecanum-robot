@@ -14,6 +14,8 @@ On Linux/macOS: python3 recover.py   (or ./recover.sh)
 On Windows:     recover.bat          (thin wrapper around this script)
 """
 
+from __future__ import annotations
+
 import json
 import re
 import shutil
@@ -27,16 +29,23 @@ WIFI_JSON = SCRIPT_DIR / 'src' / 'wifi.json'
 
 
 def die(msg: str) -> NoReturn:
+    """Print an error message to stderr and exit with a non-zero status."""
     print(f"ERROR: {msg}", file=sys.stderr)
     sys.exit(1)
 
 
-def check_tools():
+def check_tools() -> None:
+    """Exit if mpremote is not on PATH."""
     if not shutil.which('mpremote'):
         die("mpremote not found. Install: pip install mpremote")
 
 
-def list_serial_ports():
+def list_serial_ports() -> list[str]:
+    """Return a list of available serial port device paths.
+
+    Uses pyserial's comports(), which is installed as an mpremote dependency.
+    Returns an empty list if pyserial is not importable.
+    """
     try:
         from serial.tools.list_ports import comports
         return [p.device for p in comports()]
@@ -44,7 +53,13 @@ def list_serial_ports():
         return []
 
 
-def pick_port(label='device'):
+def pick_port(label: str = 'device') -> str:
+    """Prompt the user to select a serial port.
+
+    If exactly one port is detected it is returned automatically.
+    If multiple ports are found the user is shown a numbered list.
+    If no ports are detected the user is asked to type the path manually.
+    """
     ports = list_serial_ports()
     if not ports:
         return input(f"  No ports detected. Enter port path for {label}: ").strip()
@@ -60,7 +75,15 @@ def pick_port(label='device'):
     return sel
 
 
-def recover_board(port=None):
+def recover_board(port: str | None = None) -> str:
+    """Read config.json from a connected board and reconstruct local config files.
+
+    Detects board type from config content: controller-only keys (x_pin, y_pin)
+    identify a controller; their absence indicates the robot.
+
+    Writes src/wifi.json (skipped if it already exists) and
+    src/<board>/config.json. Returns the detected board name.
+    """
     args = ['mpremote']
     if port:
         args += ['connect', port]
@@ -74,7 +97,6 @@ def recover_board(port=None):
 
     c = json.loads(raw.group(0))
 
-    # Detect board type from controller-only keys
     if 'x_pin' in c or 'y_pin' in c:
         board = 'controller'
         board_keys = {k: c[k] for k in ('peer_mac_address', 'x_pin', 'y_pin') if k in c}
@@ -104,7 +126,8 @@ def recover_board(port=None):
     return board
 
 
-def main():
+def main() -> None:
+    """Run the interactive config recovery wizard."""
     check_tools()
 
     print("=== Config recovery ===")

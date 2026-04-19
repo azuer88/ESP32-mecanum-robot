@@ -13,6 +13,8 @@ On Linux/macOS: python3 setup.py   (or ./setup.sh)
 On Windows:     setup.bat          (thin wrapper around this script)
 """
 
+from __future__ import annotations
+
 import getpass
 import json
 import re
@@ -27,16 +29,23 @@ WIFI_JSON = SCRIPT_DIR / 'src' / 'wifi.json'
 
 
 def die(msg: str) -> NoReturn:
+    """Print an error message to stderr and exit with a non-zero status."""
     print(f"ERROR: {msg}", file=sys.stderr)
     sys.exit(1)
 
 
 def check_tools():
+    """Exit if mpremote is not on PATH."""
     if not shutil.which('mpremote'):
         die("mpremote not found. Install: pip install mpremote")
 
 
-def list_serial_ports():
+def list_serial_ports() -> list[str]:
+    """Return a list of available serial port device paths.
+
+    Uses pyserial's comports(), which is installed as an mpremote dependency.
+    Returns an empty list if pyserial is not importable.
+    """
     try:
         from serial.tools.list_ports import comports
         return [p.device for p in comports()]
@@ -44,7 +53,13 @@ def list_serial_ports():
         return []
 
 
-def pick_port(label='device'):
+def pick_port(label: str = 'device') -> str:
+    """Prompt the user to select a serial port.
+
+    If exactly one port is detected it is returned automatically.
+    If multiple ports are found the user is shown a numbered list.
+    If no ports are detected the user is asked to type the path manually.
+    """
     ports = list_serial_ports()
     if not ports:
         return input(f"  No ports detected. Enter port path for {label}: ").strip()
@@ -60,7 +75,12 @@ def pick_port(label='device'):
     return sel
 
 
-def get_mac(port=None):
+def get_mac(port: str | None = None) -> str | None:
+    """Read the STA interface MAC address from a connected board via mpremote exec.
+
+    Returns the MAC as an uppercase colon-separated string (e.g. 'AA:BB:CC:DD:EE:FF'),
+    or None if the address cannot be extracted from the output.
+    """
     args = ['mpremote']
     if port:
         args += ['connect', port]
@@ -72,7 +92,12 @@ def get_mac(port=None):
     return match.group(0) if match else None
 
 
-def ensure_wifi():
+def ensure_wifi() -> None:
+    """Prompt for WiFi credentials and save them to src/wifi.json.
+
+    If src/wifi.json already exists its values are offered as defaults.
+    The password is read with echo suppressed via getpass.
+    """
     ssid = key = ''
     if WIFI_JSON.exists():
         with open(WIFI_JSON) as f:
@@ -99,7 +124,11 @@ def ensure_wifi():
     print("  Saved to src/wifi.json")
 
 
-def set_peer_mac(board, mac):
+def set_peer_mac(board: str, mac: str) -> None:
+    """Write mac into peer_mac_address in src/<board>/config.json.
+
+    Creates config.json from config.json.example if it does not exist yet.
+    """
     cfg = SCRIPT_DIR / 'src' / board / 'config.json'
     if not cfg.exists():
         shutil.copy(cfg.parent / 'config.json.example', cfg)
@@ -110,7 +139,11 @@ def set_peer_mac(board, mac):
         json.dump(d, f, indent=2)
 
 
-def deploy(board, port=None):
+def deploy(board: str, port: str | None = None) -> None:
+    """Run deploy.sh (Linux/macOS) or deploy.bat (Windows) for the given board.
+
+    Passes -u <port> when a specific serial port is provided.
+    """
     if sys.platform == 'win32':
         cmd = ['deploy.bat', board]
         shell = True
@@ -122,7 +155,8 @@ def deploy(board, port=None):
     subprocess.run(cmd, check=True, cwd=SCRIPT_DIR, shell=shell)
 
 
-def main():
+def main() -> None:
+    """Run the interactive pairing wizard."""
     check_tools()
 
     print("=== Robot pairing setup ===")
