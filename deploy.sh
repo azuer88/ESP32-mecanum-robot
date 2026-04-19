@@ -10,6 +10,7 @@
 #   mpremote   pip install mpremote
 #
 # Before running:
+#   - Copy src/wifi.json.example to src/wifi.json and add WiFi credentials
 #   - Edit src/<board>/config.json (copied from config.json.example)
 #   - For the robot, also create mecanum.json on the device
 
@@ -17,6 +18,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SHARED_DIR="${SCRIPT_DIR}/src/shared"
+WIFI_JSON="${SCRIPT_DIR}/src/wifi.json"
 USB_PORT=""
 
 BOARD="$1"
@@ -51,6 +53,13 @@ if ! command -v mpremote &>/dev/null; then
     exit 1
 fi
 
+if [[ ! -f "${WIFI_JSON}" ]]; then
+    echo "ERROR: src/wifi.json not found."
+    echo "  Copy src/wifi.json.example to src/wifi.json and fill in your WiFi credentials."
+    echo "  Or run ./setup.sh to configure everything interactively."
+    exit 1
+fi
+
 if [[ ! -f "${BOARD_DIR}/config.json" ]]; then
     echo "ERROR: ${BOARD_DIR}/config.json not found."
     echo "  Copy config.json.example to config.json and fill in your values."
@@ -67,6 +76,18 @@ if [[ -z "${USB_PORT}" ]]; then
     fi
 fi
 
+# Merge wifi.json (shared) + board config.json (board-specific) into a temp file.
+# Board-specific keys win on collision.
+MERGED_CONFIG=$(mktemp /tmp/robot_config_XXXXXX.json)
+trap "rm -f ${MERGED_CONFIG}" EXIT
+
+python3 -c "
+import json
+w = json.load(open('${WIFI_JSON}'))
+b = json.load(open('${BOARD_DIR}/config.json'))
+json.dump({**w, **b}, open('${MERGED_CONFIG}', 'w'))
+"
+
 MPREMOTE="mpremote"
 if [[ -n "${USB_PORT}" ]]; then
     MPREMOTE="mpremote connect ${USB_PORT}"
@@ -75,18 +96,18 @@ fi
 echo "Deploying ${BOARD} firmware..."
 [[ -n "${USB_PORT}" ]] && echo "  Port: ${USB_PORT}"
 
-# Deploy shared files first, then board-specific files on top.
-# lib/ is merged: shared lib files go first, then board-specific lib files.
 pushd "${SHARED_DIR}" > /dev/null
 ${MPREMOTE} resume cp boot.py config.py :/ + cp -r lib :/
 popd > /dev/null
 
 pushd "${BOARD_DIR}" > /dev/null
 if [[ "$BOARD" == "robot" ]]; then
-    ${MPREMOTE} resume cp main.py config.json : \
+    ${MPREMOTE} resume cp main.py : \
+        + cp "${MERGED_CONFIG}" :config.json \
         + cp -r lib/ :lib/
 else
-    ${MPREMOTE} resume cp main.py config.json :
+    ${MPREMOTE} resume cp main.py : \
+        + cp "${MERGED_CONFIG}" :config.json
 fi
 popd > /dev/null
 

@@ -1,4 +1,5 @@
 **/config.json
+src/wifi.json
 **/webrepl_cfg.py
 *.bin
 .idea/

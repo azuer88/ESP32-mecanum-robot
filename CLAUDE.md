@@ -12,7 +12,16 @@ Use the virtualenv at `/home/lou/.virtualenvs/micropython2` for `mpremote`.
 
 `boot.py`, `config.py`, and `lib/queue.py` are shared between boards and live in `src/shared/`. The deploy script assembles shared + board-specific files before pushing.
 
+**Config is split into two files:**
+- `src/wifi.json` — WiFi credentials shared by both boards (gitignored; copy from `src/wifi.json.example`)
+- `src/<board>/config.json` — board-specific keys: `peer_mac_address`, pins (gitignored; copy from `config.json.example`)
+
+`deploy.sh` merges both at deploy time; neither is committed.
+
 ```bash
+# First time: pair both boards end-to-end (handles MACs, WiFi, deploy)
+./setup.sh
+
 # Deploy robot firmware
 ./deploy.sh robot
 
@@ -96,6 +105,7 @@ Both boards share `src/shared/config.py`: `load_config()` reads and caches `conf
 
 ## Gitignored files (must be created locally)
 
-- `**/config.json` — contains WiFi credentials and MAC addresses
+- `src/wifi.json` — WiFi credentials; copy from `src/wifi.json.example`
+- `**/config.json` — board-specific config (peer MAC, pins); copy from `config.json.example`
 - `**/webrepl_cfg.py` — generated on-device by `import webrepl_setup`, or create manually: `PASS = 'password'`
 - `*.bin` — MicroPython firmware blobs
