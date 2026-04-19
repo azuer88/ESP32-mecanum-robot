@@ -43,6 +43,16 @@ Choose the path that matches your boards:
 1. [Install mpremote](#1-install-tools)
 2. [Pair and deploy](#pairing-and-deploying-setupsh) with `./setup.sh`
 
+### Path C — Manual deploy (no setup.sh)
+
+> **Connection:** USB required for deploying firmware. Config-only edits can be done over WiFi/WebREPL once the boards are on the network — press the BOOT button first to exit the firmware and re-enable WebREPL.
+
+1. [Install mpremote](#1-install-tools)
+2. [Create config files](#configuration-reference) manually
+3. Run `./deploy.sh robot` and `./deploy.sh controller`
+
+Next: [Redeploying (deploy.sh)](#redeploying-deploysh)
+
 ### Path D — Firmware already running, no local config files
 
 > **Connection:** USB required. `mpremote` interrupts the running firmware automatically — no need to press BOOT.
@@ -61,15 +71,7 @@ The boards are paired and working but you don't have the local config files (e.g
 recover.bat
 ```
 
-After recovery, use `deploy.sh` / `deploy.bat` normally.
-
-### Path C — Manual deploy (no setup.sh)
-
-> **Connection:** USB required for deploying firmware. Config-only edits can be done over WiFi/WebREPL once the boards are on the network — press the BOOT button first to exit the firmware and re-enable WebREPL.
-
-1. [Install mpremote](#1-install-tools)
-2. [Create config files](#configuration-reference) manually
-3. Run `./deploy.sh robot` and `./deploy.sh controller`
+Next: [Redeploying (deploy.sh)](#redeploying-deploysh)
 
 ---
 
