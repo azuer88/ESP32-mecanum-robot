@@ -43,6 +43,18 @@ Choose the path that matches your boards:
 1. [Install mpremote](#1-install-tools)
 2. [Pair and deploy](#pairing-and-deploying-setupsh) with `./setup.sh`
 
+### Path D — Firmware already running, no local config files
+
+> **Connection:** USB required. `mpremote` interrupts the running firmware automatically — no need to press BOOT.
+
+The boards are paired and working but you don't have the local config files (e.g. on a new machine). `recover.sh` reads `config.json` back from each board, detects the board type automatically, and reconstructs `src/wifi.json` and the board-specific `config.json`.
+
+```bash
+./recover.sh
+```
+
+After recovery, use `deploy.sh` normally.
+
 ### Path C — Manual deploy (no setup.sh)
 
 > **Connection:** USB required for deploying firmware. Config-only edits can be done over WiFi/WebREPL once the boards are on the network — press the BOOT button first to exit the firmware and re-enable WebREPL.
@@ -445,6 +457,7 @@ The joystick button toggles between **rotate mode** (X axis turns the robot) and
 
 ```
 setup.sh              # interactive pairing wizard (first-time setup)
+recover.sh            # recover local config files from boards already deployed
 deploy.sh             # assembles shared + board files and deploys via mpremote
 deploy.bat            # Windows equivalent of deploy.sh
 provision/
