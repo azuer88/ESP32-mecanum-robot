@@ -38,14 +38,14 @@ Choose the path that matches your boards:
 
 ### Path B — Boards already running MicroPython
 
-> **Connection:** USB required for `setup.sh`. After that, config edits can be done over WiFi/WebREPL without a cable.
+> **Connection:** USB required for `setup.sh`. After that, config edits can be done over WiFi/WebREPL without a cable — press the BOOT button first to exit the firmware and re-enable WebREPL.
 
 1. [Install mpremote](#1-install-tools)
 2. [Pair and deploy](#pairing-and-deploying-setupsh) with `./setup.sh`
 
 ### Path C — Manual deploy (no setup.sh)
 
-> **Connection:** USB required for deploying firmware. Config-only edits can be done over WiFi/WebREPL once the boards are on the network.
+> **Connection:** USB required for deploying firmware. Config-only edits can be done over WiFi/WebREPL once the boards are on the network — press the BOOT button first to exit the firmware and re-enable WebREPL.
 
 1. [Install mpremote](#1-install-tools)
 2. [Create config files](#configuration-reference) manually
@@ -321,6 +321,8 @@ Each TB6612FNG module drives two motors. Tie STBY HIGH (3.3 V) to keep the modul
 ## Editing Config on the Device
 
 ### Via WebREPL or mpremote exec
+
+> **WebREPL:** press the BOOT button to exit the firmware and re-enable WebREPL before connecting. **mpremote exec:** USB required.
 
 `config.py` exposes two helpers:
 
