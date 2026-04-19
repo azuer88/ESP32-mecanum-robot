@@ -359,6 +359,97 @@ Once the device is on WiFi, connect wirelessly via the [WebREPL client](https://
 mpremote exec "import webrepl_setup"
 ```
 
+## Provisioning a New Device with provision.sh
+
+`provision/provision.sh` automates first-time setup: optionally flashes MicroPython firmware, then deploys the baseline skeleton files (`boot.py`, `config.py`, `config.json`, `webrepl_cfg.py`, `lib/`).
+
+### Prerequisites
+
+```bash
+pip install mpremote          # always required
+pip install esptool           # only needed when flashing firmware (-p)
+```
+
+### 1. Prepare the skeleton files
+
+```bash
+cd provision
+
+# Create config.json from the example and fill in your WiFi credentials
+cp skel/config.json.example skel/config.json
+# edit skel/config.json
+
+# Create webrepl_cfg.py (gitignored — set your own password)
+echo "PASS = 'your-password'" > skel/webrepl_cfg.py
+```
+
+### 2. (Optional) Download MicroPython firmware
+
+Only needed if flashing a bare or bricked board. Download the correct `.bin` for your ESP32 variant from:
+
+**<https://micropython.org/download/ESP32_GENERIC/>**
+
+As of 2026-04-19, the latest release is **v1.28.0**:
+
+```bash
+# curl
+curl -O https://micropython.org/resources/firmware/ESP32_GENERIC-20260406-v1.28.0.bin
+
+# wget
+wget https://micropython.org/resources/firmware/ESP32_GENERIC-20260406-v1.28.0.bin
+```
+
+Place the downloaded file in the `provision/` folder before running the script.
+
+| Variant | Board |
+|---|---|
+| `ESP32_GENERIC` | Standard ESP32 (most dev boards) |
+| `ESP32_GENERIC_S2` | ESP32-S2 |
+| `ESP32_GENERIC_S3` | ESP32-S3 |
+| `ESP32_GENERIC_C3` | ESP32-C3 |
+
+Place the downloaded `.bin` file in the `provision/` folder. The script picks the newest one automatically.
+
+### 3. Run the script
+
+**Deploy skeleton files only** (device already has MicroPython):
+
+```bash
+./provision.sh
+```
+
+**Flash firmware then deploy** (bare or bricked board):
+
+```bash
+# Single USB device connected
+./provision.sh -p
+
+# Multiple USB devices connected — specify the correct port
+./provision.sh -p --usb /dev/ttyUSB1
+```
+
+**Options:**
+
+| Flag | Description |
+|---|---|
+| `-p` / `--program` | Erase flash and write MicroPython before deploying |
+| `-u` / `--usb PORT` | Serial port for esptool (e.g. `/dev/ttyUSB1`, `/dev/ttyACM0`) |
+| `-d` / `--debug` | Enable bash `-x` tracing |
+
+> **Tip:** if multiple USB serial devices are connected and `--usb` is omitted, the script warns and lists available ports before proceeding.
+
+### 4. After provisioning
+
+Reset the board, then use WebREPL or `mpremote` to write the project-specific `config.json`:
+
+```python
+# In WebREPL or mpremote exec
+import config
+config.write_config('MyNetwork', 'mypassword', peer_mac_address='AA:BB:CC:DD:EE:FF')
+```
+
+Then deploy the robot or controller firmware as described in [Deploying with mpremote](#deploying-with-mpremote).
+
 ## Emergency Stop
 
 Press the **boot button** (GPIO0) on either board to trigger a clean shutdown. On the robot, all motors stop and WebREPL is re-enabled.
