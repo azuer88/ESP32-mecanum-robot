@@ -101,7 +101,7 @@ Three tasks: `read_joystick_task` (reads ADC, normalises, sends ESP-NOW), `blink
 
 ### Config system
 
-Both boards share `src/shared/config.py`: `load_config()` reads and caches `config.json`; `do_connect()` connects to WiFi and removes `wifi_key` from memory on success; `start_webrepl()` calls both. `src/shared/boot.py` checks `cfg.get('wifi_on_boot', False)` — WiFi is off by default; set `"wifi_on_boot": true` in `config.json` to enable WebREPL on boot.
+Both boards share `src/shared/config.py`: `load_config()` reads and caches `config.json`; `do_connect()` connects to WiFi and removes `wifi_key` from memory on success; `start_webrepl()` calls both. `src/shared/boot.py` checks `cfg.get('wifi_on_boot', False)` — keep this `false` or absent. Setting it `true` adds a WiFi connection attempt at boot (up to 50 s) with no benefit: `setup_espnow()` in `main.py` immediately drops the connection, leaving WebREPL unreachable. WebREPL becomes available after the BOOT button is pressed — the firmware's `finally` block calls `start_webrepl()` on exit.
 
 ## Gitignored files (must be created locally)
 
