@@ -1,0 +1,6 @@
+{
+  "fl": {"pin1": 12, "pin2": 14, "enable_pin": 27},
+  "fr": {"pin1": 26, "pin2": 25, "enable_pin": 33},
+  "rl": {"pin1": 17, "pin2": 16, "enable_pin": 32},
+  "rr": {"pin1": 18, "pin2": 19, "enable_pin": 23}
+}

@@ -197,7 +197,15 @@ setup.bat
 
 The script auto-detects the USB port. If multiple devices are connected, it lists them and asks which to use.
 
-After `setup.sh` completes, both boards are fully configured and ready. Reset them to start:
+After `setup.sh` completes, both boards are fully configured and ready to run — **except the robot**, which also needs `mecanum.json` on its filesystem before it can drive motors. Copy the example and push it:
+
+```bash
+cp src/robot/mecanum.json.example src/robot/mecanum.json
+# edit src/robot/mecanum.json if your wiring differs
+mpremote cp src/robot/mecanum.json :mecanum.json
+```
+
+Then reset both boards to start:
 
 ```bash
 mpremote reset
@@ -493,6 +501,7 @@ src/
   robot/
     main.py           # asyncio entry point
     config.json.example
+    mecanum.json.example  # sample motor pin assignments (copy to mecanum.json, push to device)
     lib/
       dcmotor.py      # DCMotor factory + TB6612FNG and MX1508 drivers
       mecanum.py      # mecanum kinematics
