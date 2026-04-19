@@ -117,6 +117,48 @@ Install via `mip` on each device, or copy manually:
 
 - [`aioespnow`](https://github.com/glenn20/micropython-espnow) — async ESP-NOW wrapper (both boards)
 
+## First-Time Setup on a Bare MicroPython ESP32
+
+These steps prepare a freshly flashed MicroPython board before deploying the project files.
+
+### 1. Install mpremote
+
+```bash
+pip install mpremote
+```
+
+### 2. Set the WebREPL password
+
+```bash
+mpremote exec "import webrepl_setup"
+```
+
+Follow the prompts to enable WebREPL and set a password. This writes `webrepl_cfg.py` to the device. Alternatively, copy the repo's `webrepl_cfg.py` directly:
+
+```bash
+mpremote cp webrepl_cfg.py :webrepl_cfg.py
+```
+
+### 3. Install aioespnow
+
+```bash
+mpremote mip install aioespnow
+```
+
+### 4. Create config.json on the device
+
+Copy the example and edit it with your values before copying:
+
+```bash
+cp config.json.example config.json
+# edit config.json
+mpremote cp config.json :config.json
+```
+
+### 5. Deploy the firmware
+
+See [Deploy the robot firmware](#deploy-the-robot-firmware) or [Deploy the controller firmware](#deploy-the-controller-firmware) below.
+
 ## Deploying with mpremote
 
 [`mpremote`](https://docs.micropython.org/en/latest/reference/mpremote.html) is the recommended tool for interacting with the device over USB.
@@ -149,6 +191,32 @@ mpremote cp boot.py main.py config.py config.json mecanum.json webrepl_cfg.py : 
 cd src/controller
 mpremote cp boot.py main.py config.py config.json webrepl_cfg.py : \
   + cp -r lib/ :lib/
+```
+
+### Updating a file on the device
+
+Use this to push a single changed `.py` file or an updated `config.json` without a full redeploy:
+
+```bash
+# Update a Python file and reset
+mpremote cp main.py :main.py + reset
+
+# Update config.json (no reset needed — read on next boot/run)
+mpremote cp config.json :config.json
+```
+
+To edit `config.json` directly on the device without touching the local copy:
+
+```bash
+mpremote exec "
+import ujson
+with open('config.json') as f:
+    cfg = ujson.load(f)
+cfg['wifi_on_boot'] = True
+with open('config.json', 'w') as f:
+    ujson.dump(cfg, f)
+print('done')
+"
 ```
 
 ### Other useful commands
