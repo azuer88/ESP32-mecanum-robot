@@ -94,17 +94,33 @@ Motor pin assignments live in `mecanum.json` on the device filesystem (not in th
 }
 ```
 
-### TB6612FNG Wiring (Module 1)
+### TB6612FNG Wiring
 
-| TB6612FNG Pin | ESP32 GPIO | Function |
-|---|---|---|
-| PWMA | 32 | Motor A speed (PWM) |
-| AIN1 | 33 | Motor A direction 1 |
-| AIN2 | 25 | Motor A direction 2 |
-| STBY | 26 | Standby (hold HIGH to enable) |
-| BIN1 | 27 | Motor B direction 1 |
-| BIN2 | 14 | Motor B direction 2 |
-| PWMB | 12 | Motor B speed (PWM) |
+Each TB6612FNG module drives two motors. STBY should be tied HIGH (3.3 V) to keep the module enabled.
+
+**Module 1 — front-left (fl) + front-right (fr)**
+
+| TB6612FNG Pin | ESP32 GPIO | Motor | Role |
+|---|---|---|---|
+| PWMA | 33 | fr | speed (PWM) |
+| AIN1 | 26 | fr | direction 1 |
+| AIN2 | 25 | fr | direction 2 |
+| STBY | 3.3 V | — | always enabled |
+| BIN1 | 12 | fl | direction 1 |
+| BIN2 | 14 | fl | direction 2 |
+| PWMB | 27 | fl | speed (PWM) |
+
+**Module 2 — rear-left (rl) + rear-right (rr)**
+
+| TB6612FNG Pin | ESP32 GPIO | Motor | Role |
+|---|---|---|---|
+| PWMA | 32 | rl | speed (PWM) |
+| AIN1 | 17 | rl | direction 1 |
+| AIN2 | 16 | rl | direction 2 |
+| STBY | 3.3 V | — | always enabled |
+| BIN1 | 18 | rr | direction 1 |
+| BIN2 | 19 | rr | direction 2 |
+| PWMB | 23 | rr | speed (PWM) |
 
 ### Controller — `src/controller/config.json`
 
