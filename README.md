@@ -280,6 +280,22 @@ deploy.bat controller
 
 The deploy scripts copy shared files (`boot.py`, `config.py`, `lib/queue.py`) from `src/shared/` first, then board-specific files (`main.py`, `config.json`, and for the robot `lib/dcmotor.py` and `lib/mecanum.py`) on top.
 
+If more than one USB serial device is connected, specify the port explicitly with `-u`:
+
+```bash
+# Linux / macOS
+./deploy.sh robot -u /dev/ttyUSB1
+./deploy.sh controller -u /dev/ttyACM0
+```
+
+```bat
+:: Windows
+deploy.bat robot -u COM3
+deploy.bat controller -u COM4
+```
+
+On Linux/macOS, if `-u` is omitted and multiple devices are detected, the script warns and lists available ports before proceeding.
+
 ### Updating a file on the device
 
 Use this to push a single changed `.py` file or an updated `config.json` without a full redeploy:
