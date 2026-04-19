@@ -10,14 +10,14 @@ MicroPython firmware for an ESP32 mecanum wheel robot controlled wirelessly over
 
 Use the virtualenv at `/home/lou/.virtualenvs/micropython2` for `mpremote`.
 
+`boot.py`, `config.py`, and `lib/queue.py` are shared between boards and live in `src/shared/`. The deploy script assembles shared + board-specific files before pushing.
+
 ```bash
 # Deploy robot firmware
-cd src/robot
-mpremote cp boot.py main.py config.py : + cp -r lib/ :lib/
+./deploy.sh robot
 
 # Deploy controller firmware
-cd src/controller
-mpremote cp boot.py main.py config.py : + cp -r lib/ :lib/
+./deploy.sh controller
 
 # Push a single changed file and reset
 mpremote cp main.py :main.py + reset
@@ -92,7 +92,7 @@ Three tasks: `read_joystick_task` (reads ADC, normalises, sends ESP-NOW), `blink
 
 ### Config system
 
-Both boards share the same `config.py` pattern: `load_config()` reads and caches `config.json`; `do_connect()` connects to WiFi and removes `wifi_key` from memory on success; `start_webrepl()` calls both. The controller's `boot.py` only calls `start_webrepl()` when `wifi_on_boot` is set; the robot always calls it.
+Both boards share `src/shared/config.py`: `load_config()` reads and caches `config.json`; `do_connect()` connects to WiFi and removes `wifi_key` from memory on success; `start_webrepl()` calls both. `src/shared/boot.py` checks `cfg.get('wifi_on_boot', False)` — WiFi is off by default; set `"wifi_on_boot": true` in `config.json` to enable WebREPL on boot.
 
 ## Gitignored files (must be created locally)
 
