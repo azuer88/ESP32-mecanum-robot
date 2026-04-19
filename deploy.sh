@@ -104,7 +104,13 @@ pushd "${BOARD_DIR}" > /dev/null
 if [[ "$BOARD" == "robot" ]]; then
     ${MPREMOTE} resume cp main.py : \
         + cp "${MERGED_CONFIG}" :config.json \
-        + cp -r lib/ :lib/
+        + cp -r lib/. :lib/
+    if [[ -f mecanum.json ]]; then
+        ${MPREMOTE} resume cp mecanum.json :mecanum.json
+    else
+        echo "WARNING: src/robot/mecanum.json not found — motors will not initialise."
+        echo "  Copy src/robot/mecanum.json.example to src/robot/mecanum.json and fill in pin numbers."
+    fi
 else
     ${MPREMOTE} resume cp main.py : \
         + cp "${MERGED_CONFIG}" :config.json

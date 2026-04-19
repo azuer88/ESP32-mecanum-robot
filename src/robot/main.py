@@ -5,7 +5,7 @@ import asyncio
 import queue
 from machine import Pin
 # noinspection PyUnresolvedReferences
-from dcmotor import DCMotor
+from lib.dcmotor import DCMotor
 from config import main_config, start_webrepl
 from lib.mecanum import MecanumDrive
 from radio import setup_espnow, monitor_button
