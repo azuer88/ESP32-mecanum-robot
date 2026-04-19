@@ -1,30 +1,77 @@
-# ESP32 Mecanum Robot — Receiver
+# ESP32 Mecanum Robot
 
-MicroPython firmware for an ESP32-based mecanum wheel robot. Movement commands are received wirelessly from a peer ESP32 via ESP-NOW and translated into per-wheel PWM signals through a TB6612FNG motor driver.
+MicroPython firmware for an ESP32-based mecanum wheel robot controlled via ESP-NOW. The project is split into two boards:
+
+- **`src/robot`** — receiver on the robot; drives four DC motors via a TB6612FNG
+- **`src/controller`** — sender; reads a 2-axis analog joystick and transmits movement commands
 
 ## Hardware
 
+### Robot
 - ESP32 dev board
 - TB6612FNG dual motor driver (×2 for four motors)
 - Four DC motors with mecanum wheels
 - Built-in LED on GPIO2, boot button on GPIO0 (emergency stop)
 
+### Controller
+- ESP32 dev board
+- KY-023 analog joystick (X → GPIO33, Y → GPIO32 by default)
+- Built-in LED on GPIO2 (blink pattern indicates strafe vs rotate mode)
+- Boot button on GPIO0 (clean shutdown)
+
 ## How It Works
 
-Four asyncio tasks run concurrently:
+Commands are JSON objects sent over ESP-NOW: `{"throttle": 0.5, "strafe": 0.0, "rotate": 0.0}` with values in `[-1.0, 1.0]`.
+
+The joystick button toggles between **rotate mode** (X axis turns the robot) and **strafe mode** (X axis slides sideways). The LED blinks fast in strafe mode and slow in rotate mode.
+
+### Robot tasks
 
 | Task | Role |
 |---|---|
-| `receive_messages` | Receives ESP-NOW packets from the controller board |
+| `receive_messages` | Receives ESP-NOW packets from the controller |
 | `handle_task` | Dequeues commands and calls `mecanum.drive()` |
 | `monitor_activity` | Watchdog — stops motors after 10 s of silence |
 | `monitor_button` | GPIO0 boot button triggers a clean shutdown |
 
-Commands are JSON objects: `{"throttle": 0.5, "strafe": 0.0, "rotate": 0.0}` with values in `[-1.0, 1.0]`.
+### Controller tasks
+
+| Task | Role |
+|---|---|
+| `read_joystick_task` | Reads ADC, normalizes values, sends ESP-NOW packets |
+| `blink_led` | Indicates current X-axis mode via blink pattern |
+| `monitor_button` | GPIO0 boot button triggers a clean shutdown |
+
+## Repository Layout
+
+```
+src/
+  robot/
+    boot.py           # connects to WiFi, starts WebREPL
+    main.py           # asyncio entry point
+    config.py         # WiFi/config helpers
+    config.json.example
+    webrepl_cfg.py
+    lib/
+      dcmotor.py      # TB6612FNG PWM control
+      mecanum.py      # mecanum kinematics
+      queue.py        # async queue
+    TB6612FNG Pinout.txt
+  controller/
+    boot.py           # loads config, optionally starts WebREPL
+    main.py           # asyncio entry point
+    config.py         # WiFi/config helpers
+    config.json.example
+    webrepl_cfg.py
+    lib/
+      queue.py        # async queue
+```
 
 ## Configuration
 
-Copy `config.json.example` to `config.json` and fill in your values:
+### Robot — `src/robot/config.json`
+
+Copy `config.json.example` and fill in:
 
 ```json
 {
@@ -34,9 +81,9 @@ Copy `config.json.example` to `config.json` and fill in your values:
 }
 ```
 
-`peer_mac_address` is the MAC address of the controller ESP32. WiFi is used for WebREPL access; ESP-NOW does not require an active WiFi association.
+`peer_mac_address` is the MAC of the **controller** ESP32.
 
-Motor pin assignments are stored in `mecanum.json` on the device filesystem:
+Motor pin assignments live in `mecanum.json` on the device filesystem (not in this repo — create it on the device):
 
 ```json
 {
@@ -47,11 +94,28 @@ Motor pin assignments are stored in `mecanum.json` on the device filesystem:
 }
 ```
 
+### Controller — `src/controller/config.json`
+
+Copy `config.json.example` and fill in:
+
+```json
+{
+  "peer_mac_address": "AA:BB:CC:DD:EE:FF",
+  "wifi_ssid": "your-network",
+  "wifi_key": "your-password",
+  "x_pin": 33,
+  "y_pin": 32,
+  "wifi_on_boot": false
+}
+```
+
+`peer_mac_address` is the MAC of the **robot** ESP32. `wifi_on_boot` defaults to `false` — set to `true` to enable WebREPL on startup.
+
 ## Dependencies
 
-Install via `mip` on the device or copy manually:
+Install via `mip` on each device, or copy manually:
 
-- [`aioespnow`](https://github.com/glenn20/micropython-espnow) — async ESP-NOW wrapper
+- [`aioespnow`](https://github.com/glenn20/micropython-espnow) — async ESP-NOW wrapper (both boards)
 
 ## Deploying with mpremote
 
@@ -71,68 +135,50 @@ mpremote
 
 Press `Ctrl+]` to exit.
 
-### Run a file without copying it
+### Deploy the robot firmware
 
 ```bash
-mpremote run main.py
-```
-
-### Copy files to the device
-
-```bash
-# Single file
-mpremote cp config.json :config.json
-
-# Entire lib directory
-mpremote cp -r lib/ :lib/
-
-# Copy all project files in one command
-mpremote cp boot.py main.py config.py config.json mecanum.json webrepl_cfg.py : + cp -r lib/ :lib/
-```
-
-The `:` prefix means the device filesystem. A trailing `:` (no filename) copies to the root.
-
-### Initial deployment (full)
-
-```bash
+cd src/robot
 mpremote cp boot.py main.py config.py config.json mecanum.json webrepl_cfg.py : \
   + cp -r lib/ :lib/
 ```
 
-### List files on the device
+### Deploy the controller firmware
 
 ```bash
+cd src/controller
+mpremote cp boot.py main.py config.py config.json webrepl_cfg.py : \
+  + cp -r lib/ :lib/
+```
+
+### Other useful commands
+
+```bash
+# List files on device
 mpremote ls
-mpremote ls :lib/
-```
 
-### Delete a file
+# Run a file without copying
+mpremote run main.py
 
-```bash
+# Copy a single file
+mpremote cp config.json :config.json
+
+# Delete a file
 mpremote rm :somefile.py
-```
 
-### Soft reset (restart without power cycle)
-
-```bash
+# Soft reset
 mpremote reset
-```
 
-### Run a command on the device
-
-```bash
+# Run a one-liner
 mpremote exec "import os; print(os.listdir())"
-```
 
-### Chain commands with `+`
-
-```bash
+# Chain commands
 mpremote cp config.json :config.json + reset
 ```
 
 ### WebREPL
 
-Once the device is on WiFi, you can connect wirelessly via WebREPL. The password is set in `webrepl_cfg.py`. Use the [WebREPL client](https://micropython.org/webrepl/) or `mpremote` over the serial connection to set it up:
+Once the device is on WiFi, connect wirelessly via the [WebREPL client](https://micropython.org/webrepl/). The password is set in `webrepl_cfg.py`. To configure it fresh:
 
 ```bash
 mpremote exec "import webrepl_setup"
@@ -140,4 +186,4 @@ mpremote exec "import webrepl_setup"
 
 ## Emergency Stop
 
-Press the **boot button** (GPIO0) while the robot is running to stop all motors and exit cleanly. WebREPL will be re-enabled after shutdown.
+Press the **boot button** (GPIO0) on either board to trigger a clean shutdown. On the robot, all motors stop and WebREPL is re-enabled.
