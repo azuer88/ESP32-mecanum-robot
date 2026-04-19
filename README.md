@@ -94,6 +94,18 @@ Motor pin assignments live in `mecanum.json` on the device filesystem (not in th
 }
 ```
 
+### TB6612FNG Wiring (Module 1)
+
+| TB6612FNG Pin | ESP32 GPIO | Function |
+|---|---|---|
+| PWMA | 32 | Motor A speed (PWM) |
+| AIN1 | 33 | Motor A direction 1 |
+| AIN2 | 25 | Motor A direction 2 |
+| STBY | 26 | Standby (hold HIGH to enable) |
+| BIN1 | 27 | Motor B direction 1 |
+| BIN2 | 14 | Motor B direction 2 |
+| PWMB | 12 | Motor B speed (PWM) |
+
 ### Controller — `src/controller/config.json`
 
 Copy `config.json.example` and fill in:
