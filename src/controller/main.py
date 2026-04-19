@@ -30,6 +30,10 @@ if PEER_MAC_ADDRESS_STR == '00:00:00:00:00:00':
 WIFI_CHANNEL = 11
 
 
+# ADC reader with exponential moving average smoothing and button-press detection.
+# A reading of 65535 is treated as a button press rather than a valid axis value.
+# num_samples: raw reads averaged per call to reduce ADC noise.
+# alpha: EMA weight for the new sample (lower = smoother, more lag).
 class DebouncedADC:
     def __init__(self, adc_pin, num_samples=50, alpha=ALPHA):
         self.adc = ADC(Pin(adc_pin))
@@ -53,24 +57,9 @@ class DebouncedADC:
         return value
 
 
+# Map value from [in_min, in_max] to [-1, 1] with a dead band around centre.
+# Values inside [dz_min, dz_max] return 0; outside are linearly interpolated.
 def rescale_with_deadzone(value, in_min, in_max, dz_min, dz_max):
-    """
-    Rescales a value to the range of -1 to 1, with a specified deadzone.
-
-    Values within the deadzone [dz_min, dz_max] are scaled to 0.
-    Values below the deadzone are scaled linearly from [in_min, dz_min] to [-1, 0].
-    Values above the deadzone are scaled linearly from [dz_max, in_max] to [0, 1].
-
-    Args:
-        value (float): The value to rescale.
-        in_min (float): The minimum of the original range.
-        in_max (float): The maximum of the original range.
-        dz_min (float): The minimum value of the deadzone.
-        dz_max (float): The maximum value of the deadzone.
-
-    Returns:
-        float: The rescaled value in the range [-1, 1], with a deadzone around 0.
-    """
     if dz_min <= value <= dz_max:
         return 0.0
 
@@ -85,6 +74,9 @@ def rescale_with_deadzone(value, in_min, in_max, dz_min, dz_max):
         return 0 + (value - dz_max) * (1 - 0) / (in_max - dz_max)
 
 
+# Rescale value to [-1, 1] with deadzone, then quantize to the nearest 0.05
+# step. Quantization reduces redundant ESP-NOW transmissions by preventing
+# tiny ADC fluctuations from producing unique values on every read.
 def normalize_value(value, amin, amax, dmin, dmax):
     if (value > dmin) and (value < dmax):
         return 0
@@ -121,8 +113,8 @@ def normalize_value(value, amin, amax, dmin, dmax):
             return q
 
 
+# Poll the boot button (GPIO0); set stop_event when pressed to trigger shutdown.
 async def monitor_button(button_pin=0):
-    """Monitors the boot button and sets the stop_event when pressed."""
     print("Monitoring boot button...")
     boot_button_pin = Pin(button_pin, Pin.IN, Pin.PULL_UP)
     while True:
@@ -135,8 +127,11 @@ async def monitor_button(button_pin=0):
     print("Monitoring button stopped.")
 
 
+# Blink the LED to indicate current drive mode:
+#   short on / long off  ->  rotate mode (X_MODE=False)
+#   50/50 duty           ->  strafe mode (X_MODE=True)
+# Toggles X_MODE when state_event is set (joystick button press).
 async def blink_led(led_pin=2, delay_ms=250):
-    """Asynchronously blinks an LED; blink pattern indicates current mode."""
     global X_MODE
     led = Pin(led_pin, Pin.OUT)
     while not stop_event.is_set():
@@ -157,8 +152,10 @@ async def blink_led(led_pin=2, delay_ms=250):
     led.value(0)
 
 
+# Read joystick axes at 100 Hz, normalize, and transmit drive commands over
+# ESP-NOW. Only sends when the value changes by more than th_delta to avoid
+# flooding the receiver. Dynamically tracks min/max to calibrate the range.
 async def read_joystick_task(e: aioespnow.AIOESPNow, x_adc: DebouncedADC, y_adc: DebouncedADC):
-    """An asynchronous task that reads and prints joystick values in a continuous loop."""
     global X_MODE
 
     print("Starting joystick reader task...")
@@ -227,8 +224,9 @@ async def read_joystick_task(e: aioespnow.AIOESPNow, x_adc: DebouncedADC, y_adc:
         await asyncio.sleep_ms(10)  # Read every 10 milliseconds
 
 
+# Initialise the Wi-Fi interface in station mode and set up ESP-NOW.
+# Raises OSError if ESP-NOW cannot be activated or the peer cannot be added.
 def setup_espnow():
-    """Initializes the Wi-Fi interface and ESP-NOW."""
     sta = network.WLAN(network.STA_IF)
     sta.active(False)  # ensure it is disabled
     sta.active(True)
@@ -247,8 +245,8 @@ def setup_espnow():
     return e
 
 
+# Start ESP-NOW and launch all async tasks; wait for stop_event then clean up.
 async def main():
-    """Main coroutine to create and schedule asynchronous tasks."""
     print("Main program starting...")
     try:
         esp_now_instance = setup_espnow()
