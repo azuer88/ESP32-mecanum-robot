@@ -108,6 +108,19 @@ async def handle_task():
         mecanum.drive(**item)
 
 
+async def blink_led():
+    while not stop_event.is_set():
+        if action_event.is_set():
+            led.value(1)
+            await asyncio.sleep_ms(20)
+        else:
+            led.value(1)
+            await asyncio.sleep_ms(100)
+            led.value(0)
+            await asyncio.sleep_ms(900)
+    led.value(0)
+
+
 async def main():
     try:
         esp_now_instance = setup_espnow()
@@ -120,9 +133,9 @@ async def main():
         asyncio.create_task(monitor_activity()),
         asyncio.create_task(control_loop()),
         asyncio.create_task(handle_task()),
-        asyncio.create_task(receive_messages(esp_now_instance))
+        asyncio.create_task(receive_messages(esp_now_instance)),
+        asyncio.create_task(blink_led()),
     ]
-    led.value(1)
     await stop_event.wait()
     led.value(0)
 
