@@ -258,7 +258,7 @@ Copy from `src/controller/config.json.example`:
 }
 ```
 
-`peer_mac_address` is the MAC of the **robot** ESP32. Add `"wifi_on_boot": true` to enable WebREPL on startup.
+`peer_mac_address` is the MAC of the **robot** ESP32. `"wifi_on_boot": true` exists but has no useful effect when the project firmware is deployed — `setup_espnow()` drops the WiFi connection on startup. Press the BOOT button instead to exit the firmware and re-enable WebREPL.
 
 ### Motor config — `mecanum.json` (on device)
 
@@ -371,7 +371,7 @@ To set or reset the WebREPL password (requires USB):
 mpremote exec "import webrepl_setup"
 ```
 
-To enable WiFi (and WebREPL) on boot, set `"wifi_on_boot": true` in the board's `config.json` and redeploy.
+`"wifi_on_boot": true` has no useful effect when the project firmware is running — `setup_espnow()` drops the WiFi connection immediately on startup, making WebREPL unreachable. Press the BOOT button to exit the firmware cleanly; WebREPL is re-enabled automatically in the shutdown handler.
 
 ---
 
