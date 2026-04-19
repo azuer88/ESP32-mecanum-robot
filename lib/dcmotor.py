@@ -25,19 +25,18 @@ class DCMotor:
     def drive(self, power: float):
         if power < -1.0 or power > 1.0:
             power = 0
+        self.power = power
+        if power == 0:
+            self.pin1.value(0)
+            self.pin2.value(0)
+            self.enable_pin.duty_u16(0)
+            return
         if power < 0.0:
-            # backward
             self.pin1.value(0)
             self.pin2.value(1)
-        elif power > 0.0:
-            # forward
+        else:
             self.pin1.value(1)
             self.pin2.value(0)
-        else:
-            self.pin1.value(0)
-            self.pin2.value(0)
-
-        self.power = power
         duty = int(trunc(abs(power) * (MAX_V - MIN_V))) + MIN_V
         print(f"Duty = {duty}")
         self.enable_pin.duty_u16(duty)

@@ -1,5 +1,4 @@
 import json
-import os
 
 from dcmotor import DCMotor
 
@@ -29,10 +28,9 @@ class MecanumDrive:
         return True
 
     def stop(self):
-        self.fl.stop()
-        self.fr.stop()
-        self.rl.stop()
-        self.rr.stop()
+        for motor in (self.fl, self.fr, self.rl, self.rr):
+            if motor is not None:
+                motor.stop()
 
     def drive(self, throttle, strafe, rotate):
         #  throttle, strafe, and rotate are in the range of -1..1

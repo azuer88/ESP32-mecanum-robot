@@ -64,7 +64,7 @@ async def monitor_button():
     print("Monitoring boot button...")
     while True:
         if boot_button_pin.value() == 0:
-            print("Button button pressed, setting stop event.")
+            print("Boot button pressed, setting stop event.")
             stop_event.set()
             break
         # noinspection PyUnresolvedReferences
@@ -122,17 +122,9 @@ async def monitor_activity():
 
 async def handle_task():
     while True:
-        if main_queue.empty():
-            # noinspection PyUnresolvedReferences
-            await asyncio.sleep_ms(100)
-            continue
-
         item = await main_queue.get()
-        tasks = []
         print(f"command: ({type(item)}) - {item}")
         mecanum.drive(**item)
-        if tasks:
-            await asyncio.gather(*tasks)
 
 
 async def main():
@@ -149,7 +141,7 @@ async def main():
 
     for task in tasks:
         task.cancel()
-    # await asyncio.gather(*tasks, return_exceptions=True)
+    await asyncio.gather(*tasks, return_exceptions=True)
     esp_now_instance.active(False)
 
     # Exit Cleanly

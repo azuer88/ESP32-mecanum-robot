@@ -68,7 +68,7 @@ def do_connect():
             if count <= 0:
                 break
 
-    if sta_if.isconnected:
+    if sta_if.isconnected():
         network_config = sta_if.ifconfig()
         print('network config:', sta_if.ifconfig())
         del main_config["wifi_key"]
