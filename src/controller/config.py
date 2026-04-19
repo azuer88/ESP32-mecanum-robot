@@ -96,6 +96,7 @@ def do_connect():
     if sta_if.isconnected():
         network_config = sta_if.ifconfig()
         print('network config:', sta_if.ifconfig())
+        main_config.pop("wifi_key", None)
     else:
         print('network config failed — continuing without WiFi.')
 

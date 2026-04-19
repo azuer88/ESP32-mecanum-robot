@@ -27,6 +27,9 @@ class MecanumDrive:
         self.setup_motors(data)
         return True
 
+    def _motors_ready(self):
+        return all(m is not None for m in (self.fl, self.fr, self.rl, self.rr))
+
     def stop(self):
         for motor in (self.fl, self.fr, self.rl, self.rr):
             if motor is not None:
@@ -34,9 +37,13 @@ class MecanumDrive:
 
     def drive(self, throttle, strafe, rotate):
         #  throttle, strafe, and rotate are in the range of -1..1
-        assert 1 >= throttle >= -1, f"Invalid throttle value {throttle}"
-        assert 1 >= strafe >= -1, f"Invalid strafe value {strafe}"
-        assert 1 >= rotate >= -1, f"Invalid rotate value {rotate}"
+        throttle = max(-1.0, min(1.0, float(throttle)))
+        strafe = max(-1.0, min(1.0, float(strafe)))
+        rotate = max(-1.0, min(1.0, float(rotate)))
+
+        if not self._motors_ready():
+            print("Motors not initialized, skipping drive command")
+            return
 
         if throttle == 0 and strafe == 0 and rotate == 0:
             self.stop()
@@ -64,6 +71,8 @@ class MecanumDrive:
         self.rr.drive(rr)
 
     def asdict(self) -> dict:
+        if not self._motors_ready():
+            raise RuntimeError("Motors not fully initialized")
         return {
             'fl': self.fl.asdict(),
             'fr': self.fr.asdict(),

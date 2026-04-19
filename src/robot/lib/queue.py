@@ -75,7 +75,7 @@ class Queue:
     def full(self):  # Return True if there are maxsize items in the queue.
         # Note: if the Queue was initialized with maxsize=0 (the default) or
         # any negative number, then full() is never True.
-        return 0 < self.maxsize <= self.qsize()
+        return self.maxsize > 0 and self.qsize() >= self.maxsize
 
     def _upd_jnevt(self, inc: int):  # #Update join count and join event
         self._jncnt += inc

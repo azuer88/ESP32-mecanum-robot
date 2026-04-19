@@ -5,10 +5,11 @@ from math import trunc
 
 from machine import Pin, PWM
 
-# the min_duty and max_duty are defined for 15000Hz frequency
+# Tuned for 15000Hz; 0.8 cap avoids motor overheating at sustained full load
 FREQUENCY = 15000
-MAX_V = int(65535 * 0.8)  # max duty
-MIN_V = 41200  # min duty
+MAX_V = int(65535 * 0.8)
+# Minimum duty to overcome motor stiction at this frequency
+MIN_V = 41200
 
 
 class DCMotor:
@@ -38,28 +39,22 @@ class DCMotor:
             self.pin1.value(1)
             self.pin2.value(0)
         duty = int(trunc(abs(power) * (MAX_V - MIN_V))) + MIN_V
-        print(f"Duty = {duty}")
         self.enable_pin.duty_u16(duty)
 
     def move(self, duty: int, direction: int):
         if direction:
-            print("dir: forward")
             self.pin1.value(1)
             self.pin2.value(0)
         else:
-            print("dir: backward")
             self.pin1.value(0)
             self.pin2.value(1)
         if duty == 0:
             self.pin1.value(0)
             self.pin2.value(0)
-        print(f"duty: {duty}")
         self.enable_pin.duty_u16(duty)
 
     def stop(self):
         self.enable_pin.duty_u16(0)
-        # self.pin1.value(0)
-        # self.pin2.value(0)
 
     def __str__(self):
         return f"DCMotor [{self.gpio_pin1}:{self.gpio_pin2}+{self.gpio_enable_pin}]"

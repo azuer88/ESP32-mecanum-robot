@@ -1,6 +1,4 @@
 import math
-# import time
-
 import json
 import network
 # noinspection PyUnresolvedReferences
@@ -16,7 +14,7 @@ Y_DEADZONE = (28660, 33000)
 X_MINMAX = (15000, 48000)
 Y_MINMAX = (15000, 48000)
 TRUNC_VALUE = 100
-ALPHA = 0.10 
+ALPHA = 0.10
 
 X_MODE = False  # True - strafe mode, False - rotate mode
 state_event = asyncio.Event()
@@ -25,27 +23,11 @@ stop_event = asyncio.Event()
 
 PEER_MAC_ADDRESS_STR = main_config.get('peer_mac_address', '00:00:00:00:00:00')
 PEER_MAC_ADDRESS = ubinascii.unhexlify(PEER_MAC_ADDRESS_STR.replace(':', ''))
-WIFI_CHANNEL = 11
 
-# --- Hardware pin assignments ---
-# ESP32: sample_ns is not supported. Use atten to set voltage range.
-# Use ADC.ATTN_11DB for a range of approximately 0V to 3.6V.
-# try:
-#     y_adc = ADC(Pin(main_config.get('y_pin', 32)))
-#     x_adc = ADC(Pin(main_config.get('x_pin', 33)))
-#     # noinspection PyUnresolvedReferences
-#     x_adc.atten(ADC.ATTN_11DB)
-#     # noinspection PyUnresolvedReferences
-#     y_adc.atten(ADC.ATTN_11DB)
-#     print("Configured for ESP32.")
-#
-# # RP2040 (Raspberry Pi Pico): sample_ns is supported. atten is not.
-# except ImportError:
-#     # noinspection PyArgumentList
-#     x_adc = ADC(Pin(26, sample_ns=5000))  # 5000ns sampling time for X-axis
-#     # noinspection PyArgumentList
-#     y_adc = ADC(Pin(27, sample_ns=1000))  # 1000ns sampling time for Y-axis
-#     print("Configured for RP2040 (Pico).")
+if PEER_MAC_ADDRESS_STR == '00:00:00:00:00:00':
+    print("WARNING: peer_mac_address not set in config.json — ESP-NOW will fail")
+
+WIFI_CHANNEL = 11
 
 
 class DebouncedADC:
@@ -89,34 +71,24 @@ def rescale_with_deadzone(value, in_min, in_max, dz_min, dz_max):
     Returns:
         float: The rescaled value in the range [-1, 1], with a deadzone around 0.
     """
-    # Check if the value is within the deadzone
     if dz_min <= value <= dz_max:
         return 0.0
 
-    # Rescale the lower range
     elif value < dz_min:
-        # Check for division by zero
         if dz_min == in_min:
             return -1.0 if value <= in_min else 0.0
-        
-        # Apply the linear interpolation formula
         return -1 + (value - in_min) * (0 - -1) / (dz_min - in_min)
 
-    # Rescale the upper range
     else:  # value > dz_max
-        # Check for division by zero
         if in_max == dz_max:
             return 1.0 if value >= in_max else 0.0
-            
-        # Apply the linear interpolation formula
         return 0 + (value - dz_max) * (1 - 0) / (in_max - dz_max)
 
-    
+
 def normalize_value(value, amin, amax, dmin, dmax):
     if (value > dmin) and (value < dmax):
         return 0
     else:
-
         q = rescale_with_deadzone(value, amin, amax, dmin, dmax) * TRUNC_VALUE
 
         if q < 0:
@@ -126,10 +98,11 @@ def normalize_value(value, amin, amax, dmin, dmax):
             negative = True
         else:
             q = math.ceil(q) / TRUNC_VALUE
-            if q > 1: 
+            if q > 1:
                 q = 1
             negative = False
 
+        # Quantize to nearest 0.05 step to reduce jitter in transmitted values
         r = math.trunc(abs(q * TRUNC_VALUE))
         unit = r % 10
         if unit <= 5:
@@ -162,11 +135,8 @@ async def monitor_button(button_pin=0):
     print("Monitoring button stopped.")
 
 
-# --- Asynchronous task to blink LED
 async def blink_led(led_pin=2, delay_ms=250):
-    """
-    Asynchronously blinks an LED connected to the specified pin.
-    """
+    """Asynchronously blinks an LED; blink pattern indicates current mode."""
     global X_MODE
     led = Pin(led_pin, Pin.OUT)
     while not stop_event.is_set():
@@ -180,14 +150,13 @@ async def blink_led(led_pin=2, delay_ms=250):
             off_delay_ms = delay_ms - delay_ms // 2
         else:
             off_delay_ms = delay_ms - 10
-        led.value(1)  # Turn LED on
+        led.value(1)
         await asyncio.sleep_ms(delay_ms - off_delay_ms)
-        led.value(0)  # Turn LED off
+        led.value(0)
         await asyncio.sleep_ms(off_delay_ms)
     led.value(0)
 
 
-# --- Asynchronous task for reading joystick values ---
 async def read_joystick_task(e: aioespnow.AIOESPNow, x_adc: DebouncedADC, y_adc: DebouncedADC):
     """An asynchronous task that reads and prints joystick values in a continuous loop."""
     global X_MODE
@@ -195,25 +164,16 @@ async def read_joystick_task(e: aioespnow.AIOESPNow, x_adc: DebouncedADC, y_adc:
     print("Starting joystick reader task...")
     x_min, x_max = X_MINMAX
     y_min, y_max = Y_MINMAX
-    
+
     last_x = 0
     last_y = 0
+    # Discard first few readings while ADC stabilizes
     skip = 5
-    # start_ms = time.ticks_ms()
     while not stop_event.is_set():
         th_delta = 2 / TRUNC_VALUE
-        # new_x = x_adc.read_u16()
-        # new_y = y_adc.read_u16()
-        # x_value = alpha * x_value + (1 - alpha) * new_x
-        # y_value = alpha * y_value + (1 - alpha) * new_y
         x_value = x_adc.read()
         y_value = y_adc.read()
 
-        # if x_value == 65535 or y_value == 65535:
-        #     button_pressed = True
-        #     state_event.set()
-        # else:
-        #     button_pressed = False
         button_pressed = x_adc.button_pressed or y_adc.button_pressed
         if button_pressed:
             await asyncio.sleep_ms(200)
@@ -225,10 +185,10 @@ async def read_joystick_task(e: aioespnow.AIOESPNow, x_adc: DebouncedADC, y_adc:
         if x_value != 65535:
             y_max = (max(y_max, y_value) + y_max) // 2
         y_min = (min(y_min, y_value) + y_min) // 2
-        
+
         x = -normalize_value(x_value, x_min, x_max, *X_DEADZONE)
         y = normalize_value(y_value, y_min, y_max, *Y_DEADZONE)
-        
+
         xdelta = abs(x - last_x)
         ydelta = abs(y - last_y)
         if (x == 0.0 and y == 0.0) and (x != last_x or y != last_y):
@@ -267,7 +227,6 @@ async def read_joystick_task(e: aioespnow.AIOESPNow, x_adc: DebouncedADC, y_adc:
         await asyncio.sleep_ms(10)  # Read every 10 milliseconds
 
 
-# --- Setup Wi-Fi and ESP-NOW ---
 def setup_espnow():
     """Initializes the Wi-Fi interface and ESP-NOW."""
     sta = network.WLAN(network.STA_IF)
@@ -288,26 +247,23 @@ def setup_espnow():
     return e
 
 
-# --- Main coroutine to set up and run tasks ---
 async def main():
     """Main coroutine to create and schedule asynchronous tasks."""
     print("Main program starting...")
-    esp_now_instance = setup_espnow()
+    try:
+        esp_now_instance = setup_espnow()
+    except OSError as err:
+        print(f"Fatal: could not initialize ESP-NOW: {err}")
+        return
+
     x_adc = DebouncedADC(main_config.get('x_pin', 33))
     y_adc = DebouncedADC(main_config.get('y_pin', 32))
     tasks = [
-        # Create the joystick reading task.
         asyncio.create_task(read_joystick_task(esp_now_instance, x_adc, y_adc)),
-        # Create the led blinking task.
         asyncio.create_task(blink_led()),
         asyncio.create_task(monitor_button()),
+    ]
 
-        ]
-    
-    # The main loop can perform other non-blocking operations here.
-    # while True:
-    #     print("Main loop: Doing other work...")
-    #     await asyncio.sleep_ms(2000)  # Other work happens every 2 seconds
     await stop_event.wait()
 
     for task in tasks:
@@ -316,7 +272,6 @@ async def main():
     esp_now_instance.active(False)
 
 
-# --- Run the asyncio event loop ---
 try:
     asyncio.run(main())
 except KeyboardInterrupt:
