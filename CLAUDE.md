@@ -83,7 +83,7 @@ Five concurrent `asyncio` tasks:
 | `control_loop` | 50 Hz loop; drives motors from `_current_cmd` when `main_queue` is empty |
 | `handle_task` | Drains `main_queue`; non-empty queue suppresses `control_loop` (scripted takes priority) |
 | `monitor_activity` | Stops motors and zeros `_current_cmd` after `TIMEOUT_S` seconds of silence |
-| `monitor_button` | GPIO0 boot button triggers clean shutdown |
+| `monitor_button` | BOOT button (GPIO0) triggers clean shutdown |
 
 ### Controller async task model (`src/controller/main.py`)
 

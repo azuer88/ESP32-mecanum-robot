@@ -11,13 +11,13 @@ MicroPython firmware for an ESP32-based mecanum wheel robot controlled via ESP-N
 - ESP32 dev board
 - TB6612FNG dual motor driver ×2 (or MX1508 ×4)
 - Four DC motors with mecanum wheels
-- Built-in LED on GPIO2, boot button on GPIO0 (emergency stop)
+- Built-in LED on GPIO2, BOOT button (GPIO0) (emergency stop)
 
 ### Controller
 - ESP32 dev board
 - KY-023 analog joystick (X → GPIO33, Y → GPIO32 by default)
 - Built-in LED on GPIO2 (blink pattern indicates mode)
-- Boot button on GPIO0 (clean shutdown)
+- BOOT button (GPIO0) (clean shutdown)
 
 ---
 
@@ -27,16 +27,22 @@ Choose the path that matches your boards:
 
 ### Path A — Bare boards (no MicroPython yet)
 
+> **Connection:** USB required throughout.
+
 1. [Install tools](#1-install-tools) (mpremote + esptool)
 2. [Provision each board](#provisioning-bare-boards) with `provision.sh`
 3. [Pair and deploy](#pairing-and-deploying-setupsh) with `./setup.sh`
 
 ### Path B — Boards already running MicroPython
 
+> **Connection:** USB required for `setup.sh`. After that, config edits can be done over WiFi/WebREPL without a cable.
+
 1. [Install mpremote](#1-install-tools)
 2. [Pair and deploy](#pairing-and-deploying-setupsh) with `./setup.sh`
 
 ### Path C — Manual deploy (no setup.sh)
+
+> **Connection:** USB required for deploying firmware. Config-only edits can be done over WiFi/WebREPL once the boards are on the network.
 
 1. [Install mpremote](#1-install-tools)
 2. [Create config files](#configuration-reference) manually
@@ -350,11 +356,13 @@ with open('config.json', 'w') as f:
 
 ## WebREPL
 
-Once a board is connected to WiFi, you can access it wirelessly via the [WebREPL client](https://micropython.org/webrepl/).
+Once a board is connected to WiFi, you can access it wirelessly via the [WebREPL client](https://micropython.org/webrepl/). No USB cable needed.
 
 The password in `webrepl_cfg.py` is used only to authenticate connections to the board over WebREPL — it is separate from your WiFi password.
 
-To set or reset the WebREPL password:
+**Getting into WebREPL mode while project firmware is running:** press the BOOT button (GPIO0). The firmware shuts down cleanly and WebREPL starts automatically. The board stays on the network and accepts connections without a USB cable.
+
+To set or reset the WebREPL password (requires USB):
 
 ```bash
 mpremote exec "import webrepl_setup"
@@ -414,7 +422,7 @@ The joystick button toggles between **rotate mode** (X axis turns the robot) and
 | `control_loop` | Drives motors at 50 Hz from the live register |
 | `handle_task` | Drains the scripted FIFO queue; takes priority over `control_loop` |
 | `monitor_activity` | Watchdog — stops motors after 10 s of silence |
-| `monitor_button` | GPIO0 boot button triggers a clean shutdown |
+| `monitor_button` | BOOT button (GPIO0) triggers a clean shutdown |
 
 ### Controller tasks (`src/controller/main.py`)
 
@@ -422,7 +430,7 @@ The joystick button toggles between **rotate mode** (X axis turns the robot) and
 |---|---|
 | `read_joystick_task` | Reads ADC, normalizes values, sends ESP-NOW packets |
 | `blink_led` | Indicates current X-axis mode via blink pattern |
-| `monitor_button` | GPIO0 boot button triggers a clean shutdown |
+| `monitor_button` | BOOT button (GPIO0) triggers a clean shutdown |
 
 `DebouncedADC` averages 50 raw samples per read and applies an EMA filter. Values are quantised to 0.05 steps to suppress jitter. A reading of `65535` is treated as a joystick button press (mode toggle), not an axis value.
 
@@ -459,4 +467,4 @@ src/
 
 ## Emergency Stop
 
-Press the **boot button** (GPIO0) on either board for a clean shutdown. On the robot, all motors stop immediately.
+Press the **BOOT button** (GPIO0) on either board for a clean shutdown. On the robot, all motors stop immediately. On both boards, the firmware exits and **WebREPL is re-enabled** — so after pressing the button the board becomes accessible wirelessly over WiFi without a USB cable (provided `wifi_ssid` and `wifi_key` are set in `config.json`).
