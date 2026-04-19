@@ -293,6 +293,39 @@ print('done')
 "
 ```
 
+### Editing config.json via WebREPL
+
+`config.py` exposes two helpers designed for use in the WebREPL console:
+
+**`write_config(ssid, key, **kwargs)`** — creates or fully overwrites `config.json`. Use this for initial setup or when you want a clean slate.
+
+```python
+import config
+
+# Robot: set WiFi credentials and the controller's MAC address
+config.write_config('MyNetwork', 'mypassword', peer_mac_address='AA:BB:CC:DD:EE:FF')
+
+# Controller: same, plus joystick pin overrides
+config.write_config('MyNetwork', 'mypassword', peer_mac_address='AA:BB:CC:DD:EE:FF', x_pin=34, y_pin=35)
+```
+
+**`update_config(**kwargs)`** — merges one or more keys into the existing `config.json`, leaving everything else untouched. Use this to change a single setting without rewriting the whole file.
+
+```python
+import config
+
+# Change the peer MAC address only
+config.update_config(peer_mac_address='AA:BB:CC:DD:EE:FF')
+
+# Update WiFi credentials
+config.update_config(wifi_ssid='NewNetwork', wifi_key='newpassword')
+
+# Remap joystick pins (controller only)
+config.update_config(x_pin=34, y_pin=35)
+```
+
+> **Note:** changes take effect on the next boot. Soft-reset the board after editing: `mpremote reset` or press the reset button.
+
 ### Other useful commands
 
 ```bash

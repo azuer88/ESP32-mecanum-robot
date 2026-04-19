@@ -6,7 +6,14 @@ network_config = None
 main_config = None
 
 
-# Write a new config.json with WiFi credentials and any extra kwargs.
+# Write a new config.json with WiFi credentials and any extra keys.
+# Intended for use in WebREPL to do initial device setup or full config reset.
+# Any existing config.json is overwritten.
+# Extra kwargs (e.g. peer_mac_address, x_pin, y_pin) are merged into the file.
+#
+# Usage (in WebREPL):
+#   import config
+#   config.write_config('MyNetwork', 'mypassword', peer_mac_address='AA:BB:CC:DD:EE:FF')
 def write_config(ssid, key, **kwargs):
     data = {
         "wifi_ssid": ssid,
@@ -22,6 +29,14 @@ def write_config(ssid, key, **kwargs):
 
 
 # Merge kwargs into the existing config.json, preserving all other keys.
+# Intended for use in WebREPL to change individual settings without
+# rewriting the whole file.
+#
+# Usage (in WebREPL):
+#   import config
+#   config.update_config(peer_mac_address='AA:BB:CC:DD:EE:FF')
+#   config.update_config(x_pin=34, y_pin=35)
+#   config.update_config(wifi_ssid='NewNetwork', wifi_key='newpassword')
 def update_config(**kwargs):
     try:
         with open("config.json", "r") as f:
