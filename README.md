@@ -1,90 +1,222 @@
 # ESP32 Mecanum Robot
 
-MicroPython firmware for an ESP32-based mecanum wheel robot controlled via ESP-NOW. The project is split into two boards:
+MicroPython firmware for an ESP32-based mecanum wheel robot controlled via ESP-NOW. Two boards talk directly to each other — no router needed.
 
-- **`src/robot`** — receiver on the robot; drives four DC motors via TB6612FNG or MX1508 drivers
-- **`src/controller`** — sender; reads a 2-axis analog joystick and transmits movement commands
+- **`src/robot`** — drives four DC motors via TB6612FNG or MX1508 drivers
+- **`src/controller`** — reads a 2-axis analog joystick and sends movement commands
 
 ## Hardware
 
 ### Robot
 - ESP32 dev board
-- TB6612FNG dual motor driver (×2 for four motors)
+- TB6612FNG dual motor driver ×2 (or MX1508 ×4)
 - Four DC motors with mecanum wheels
 - Built-in LED on GPIO2, boot button on GPIO0 (emergency stop)
 
 ### Controller
 - ESP32 dev board
 - KY-023 analog joystick (X → GPIO33, Y → GPIO32 by default)
-- Built-in LED on GPIO2 (blink pattern indicates strafe vs rotate mode)
+- Built-in LED on GPIO2 (blink pattern indicates mode)
 - Boot button on GPIO0 (clean shutdown)
 
-## How It Works
+---
 
-Commands are JSON objects sent over ESP-NOW with values in `[-1.0, 1.0]`:
+## Getting Started
 
-```json
-{"throttle": 0.5, "strafe": 0.0, "rotate": 0.0}
+Choose the path that matches your boards:
+
+### Path A — Bare boards (no MicroPython yet)
+
+1. [Install tools](#1-install-tools) (mpremote + esptool)
+2. [Provision each board](#provisioning-bare-boards) with `provision.sh`
+3. [Pair and deploy](#pairing-and-deploying-setupsh) with `./setup.sh`
+
+### Path B — Boards already running MicroPython
+
+1. [Install mpremote](#1-install-tools)
+2. [Pair and deploy](#pairing-and-deploying-setupsh) with `./setup.sh`
+
+### Path C — Manual deploy (no setup.sh)
+
+1. [Install mpremote](#1-install-tools)
+2. [Create config files](#configuration-reference) manually
+3. Run `./deploy.sh robot` and `./deploy.sh controller`
+
+---
+
+## 1. Install Tools
+
+mpremote is required for all paths. esptool is only needed when flashing firmware (Path A).
+
+**Linux / macOS**
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install mpremote==1.28.0
+pip install esptool          # Path A only
 ```
 
-An optional `"queued": true` field routes the command into a FIFO queue for scripted sequences. Without it (the default), the command overwrites a live register that the robot reads at 50 Hz. The scripted queue takes priority — the live register is ignored while commands are queued.
+**Debian / Ubuntu** — the system Python is often too old. Install Python 3.12 first:
 
-The joystick button toggles between **rotate mode** (X axis turns the robot) and **strafe mode** (X axis slides sideways). The LED blinks fast in strafe mode and slow in rotate mode.
+```bash
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt update
+sudo apt install python3.12 python3.12-venv
+python3.12 -m venv venv
+source venv/bin/activate
+pip install mpremote==1.28.0
+```
 
-### Robot tasks
+**Windows** — Python 3.12 recommended, download from [python.org](https://www.python.org/downloads/windows/).
 
-| Task | Role |
+```bat
+python -m venv venv
+venv\Scripts\activate
+pip install mpremote==1.28.0
+```
+
+Activate the virtual environment each time before using `mpremote`.
+
+---
+
+## Provisioning Bare Boards
+
+> Skip this section if your boards already have MicroPython — go straight to [Pairing and Deploying](#pairing-and-deploying-setupsh).
+
+`provision/provision.sh` prepares a bare ESP32: it optionally flashes MicroPython, then deploys a minimal baseline (`boot.py`, `config.py`, `config.json`, `webrepl_cfg.py`, `lib/`) that gives you a working WebREPL and the config helpers.
+
+**This is not the project firmware.** After provisioning, continue to [Pairing and Deploying](#pairing-and-deploying-setupsh).
+
+### 1. Prepare skeleton files
+
+```bash
+cd provision
+
+# WiFi credentials for the baseline config
+cp skel/config.json.example skel/config.json
+# edit skel/config.json — fill in wifi_ssid and wifi_key
+
+# WebREPL password (used only to authenticate WebREPL connections, not your WiFi password)
+echo "PASS = 'your-password'" > skel/webrepl_cfg.py
+```
+
+### 2. Download MicroPython firmware (if flashing)
+
+Download the correct `.bin` for your ESP32 variant from **<https://micropython.org/download/ESP32_GENERIC/>** and place it in the `provision/` folder. The script picks the newest file automatically.
+
+| Variant | Board |
 |---|---|
-| `receive_messages` | Receives ESP-NOW packets; routes to queue or live register |
-| `control_loop` | Drives motors at 50 Hz from the live register (joystick) |
-| `handle_task` | Drains the scripted FIFO queue; takes priority over `control_loop` |
-| `monitor_activity` | Watchdog — stops motors after 10 s of silence |
-| `monitor_button` | GPIO0 boot button triggers a clean shutdown |
+| `ESP32_GENERIC` | Standard ESP32 (most dev boards) |
+| `ESP32_GENERIC_S2` | ESP32-S2 |
+| `ESP32_GENERIC_S3` | ESP32-S3 |
+| `ESP32_GENERIC_C3` | ESP32-C3 |
 
-### Controller tasks
+As of April 2026, the latest release is **v1.28.0**:
 
-| Task | Role |
+```bash
+curl -O https://micropython.org/resources/firmware/ESP32_GENERIC-20260406-v1.28.0.bin
+```
+
+### 3. Run provision.sh
+
+Provision one board at a time. Repeat for each board.
+
+```bash
+# Board already has MicroPython — deploy baseline only
+./provision.sh
+
+# Bare board — flash firmware then deploy baseline
+./provision.sh -p
+
+# Multiple USB devices connected — specify the port
+./provision.sh -p --usb /dev/ttyUSB1
+```
+
+| Flag | Description |
 |---|---|
-| `read_joystick_task` | Reads ADC, normalizes values, sends ESP-NOW packets |
-| `blink_led` | Indicates current X-axis mode via blink pattern |
-| `monitor_button` | GPIO0 boot button triggers a clean shutdown |
+| `-p` / `--program` | Erase flash and write MicroPython before deploying |
+| `-u` / `--usb PORT` | Serial port (e.g. `/dev/ttyUSB1`, `/dev/ttyACM0`) |
+| `-d` / `--debug` | Enable bash `-x` tracing |
 
-## Repository Layout
+After provisioning both boards, continue to the next section.
 
-```
-setup.sh              # interactive pairing wizard (first-time setup)
-deploy.sh             # assembles shared + board files and deploys via mpremote
-src/
-  wifi.json.example   # WiFi credentials template (copy to wifi.json, gitignored)
-  shared/
-    boot.py           # boot sequence (shared by both boards)
-    config.py         # WiFi/config helpers (shared by both boards)
-    lib/
-      queue.py        # async queue (shared by both boards)
-  robot/
-    main.py           # asyncio entry point
-    config.json.example
-    webrepl_cfg.py    # WebREPL password file — device-generated or created manually (gitignored)
-    lib/
-      dcmotor.py      # DCMotor factory + TB6612FNG and MX1508 drivers
-      mecanum.py      # mecanum kinematics
-    TB6612FNG Pinout.txt
-  controller/
-    main.py           # asyncio entry point
-    config.json.example
-    webrepl_cfg.py    # WebREPL password file — device-generated or created manually (gitignored)
+---
+
+## Pairing and Deploying (setup.sh)
+
+`setup.sh` is an interactive wizard that configures both boards end-to-end:
+
+1. Collects WiFi credentials and saves them to `src/wifi.json`
+2. Connects to the first board, reads its MAC address, deploys firmware
+3. Connects to the second board, reads its MAC address, deploys firmware with the first board's MAC as peer
+4. Reconnects to the first board and pushes an updated config with the second board's MAC
+
+```bash
+./setup.sh
 ```
 
-## Configuration
+The script auto-detects the USB port. If multiple devices are connected, it lists them and asks which to use.
+
+After `setup.sh` completes, both boards are fully configured and ready. Reset them to start:
+
+```bash
+mpremote reset
+```
+
+---
+
+## Redeploying (deploy.sh)
+
+Use `deploy.sh` to push updated firmware to a board after the initial pairing is done.
+
+```bash
+# Linux / macOS
+./deploy.sh robot
+./deploy.sh controller
+
+# Windows
+deploy.bat robot
+deploy.bat controller
+```
+
+Specify a port when multiple USB devices are connected:
+
+```bash
+./deploy.sh robot -u /dev/ttyUSB1
+./deploy.sh controller -u /dev/ttyACM0
+```
+
+```bat
+deploy.bat robot -u COM3
+```
+
+The script merges `src/wifi.json` (shared WiFi credentials) with the board's `config.json` (peer MAC, pins) before pushing. See [Configuration Reference](#configuration-reference) for details.
+
+### Pushing a single file
+
+To update one file without a full redeploy:
+
+```bash
+mpremote cp main.py :main.py + reset
+```
+
+---
+
+## Configuration Reference
 
 Config is split into two files so WiFi credentials are managed in one place:
 
-- **`src/wifi.json`** — WiFi credentials shared by both boards (gitignored; copy from `src/wifi.json.example`)
-- **`src/<board>/config.json`** — board-specific keys: peer MAC and pin assignments (gitignored; copy from `config.json.example`)
+| File | Contents | Shared? |
+|---|---|---|
+| `src/wifi.json` | `wifi_ssid`, `wifi_key` | Both boards |
+| `src/<board>/config.json` | `peer_mac_address`, pins | Per board |
 
-`deploy.sh` merges both at deploy time before pushing to the device. Use `./setup.sh` the first time to configure everything interactively.
+Both are gitignored. `deploy.sh` merges them at deploy time — board-specific keys win on collision.
 
 ### WiFi — `src/wifi.json`
+
+Copy from `src/wifi.json.example`:
 
 ```json
 {
@@ -95,7 +227,7 @@ Config is split into two files so WiFi credentials are managed in one place:
 
 ### Robot — `src/robot/config.json`
 
-Copy `config.json.example` and fill in:
+Copy from `src/robot/config.json.example`:
 
 ```json
 {
@@ -105,9 +237,25 @@ Copy `config.json.example` and fill in:
 
 `peer_mac_address` is the MAC of the **controller** ESP32.
 
-Motor pin assignments live in `mecanum.json` on the device filesystem (not in this repo — create it on the device). The format depends on the motor driver in use.
+### Controller — `src/controller/config.json`
 
-**TB6612FNG** (3-pin: two direction pins + PWM enable):
+Copy from `src/controller/config.json.example`:
+
+```json
+{
+  "peer_mac_address": "AA:BB:CC:DD:EE:FF",
+  "x_pin": 33,
+  "y_pin": 32
+}
+```
+
+`peer_mac_address` is the MAC of the **robot** ESP32. Add `"wifi_on_boot": true` to enable WebREPL on startup.
+
+### Motor config — `mecanum.json` (on device)
+
+Motor pin assignments live in `mecanum.json` on the robot's filesystem (not in this repo — create it on the device). The format depends on the motor driver.
+
+**TB6612FNG** (3-pin per motor: two direction pins + PWM enable):
 
 ```json
 {
@@ -118,7 +266,7 @@ Motor pin assignments live in `mecanum.json` on the device filesystem (not in th
 }
 ```
 
-**MX1508** (2-pin: both pins carry PWM, direction is encoded by which pin is active):
+**MX1508** (2-pin per motor: direction encoded by which pin is active):
 
 ```json
 {
@@ -129,11 +277,11 @@ Motor pin assignments live in `mecanum.json` on the device filesystem (not in th
 }
 ```
 
-Mixed driver types are supported — each motor entry is routed to the correct driver automatically based on whether `enable_pin` is present.
+Mixed driver types are supported — each motor entry is routed to the correct driver based on whether `enable_pin` is present.
 
 ### TB6612FNG Wiring
 
-Each TB6612FNG module drives two motors. STBY should be tied HIGH (3.3 V) to keep the module enabled.
+Each TB6612FNG module drives two motors. Tie STBY HIGH (3.3 V) to keep the module enabled.
 
 **Module 1 — front-left (fl) + front-right (fr)**
 
@@ -159,177 +307,33 @@ Each TB6612FNG module drives two motors. STBY should be tied HIGH (3.3 V) to kee
 | BIN2 | 19 | rr | direction 2 |
 | PWMB | 23 | rr | speed (PWM) |
 
-### Controller — `src/controller/config.json`
+---
 
-Copy `config.json.example` and fill in:
+## Editing Config on the Device
 
-```json
-{
-  "peer_mac_address": "AA:BB:CC:DD:EE:FF",
-  "x_pin": 33,
-  "y_pin": 32
-}
+### Via WebREPL or mpremote exec
+
+`config.py` exposes two helpers:
+
+**`write_config(ssid, key, **kwargs)`** — creates or fully overwrites `config.json`:
+
+```python
+import config
+config.write_config('MyNetwork', 'mypassword', peer_mac_address='AA:BB:CC:DD:EE:FF')
 ```
 
-`peer_mac_address` is the MAC of the **robot** ESP32. `x_pin` and `y_pin` default to 33 and 32. Add `"wifi_on_boot": true` to enable WebREPL on startup.
+**`update_config(**kwargs)`** — merges one or more keys into the existing file:
 
-## Dependencies
-
-Install via `mip` on each device, or copy manually:
-
-- [`aioespnow`](https://github.com/glenn20/micropython-espnow) — async ESP-NOW wrapper (both boards)
-
-## First-Time Setup on a Bare MicroPython ESP32
-
-> **Shortcut:** if both boards are already running MicroPython, run `./setup.sh` instead. It handles MAC exchange, WiFi config, and firmware deploy for both boards in one interactive session.
-
-These steps prepare a freshly flashed MicroPython board before deploying the project files.
-
-### 1. Install mpremote
-
-The current stable release is **mpremote 1.28.0**. It is recommended to install it inside a virtual environment to avoid conflicts with system packages.
-
-**Windows** — Python 3.12 is recommended. Download from [python.org](https://www.python.org/downloads/windows/).
-
-```bat
-python -m venv venv
-venv\Scripts\activate
-pip install mpremote==1.28.0
+```python
+import config
+config.update_config(peer_mac_address='AA:BB:CC:DD:EE:FF')
+config.update_config(wifi_ssid='NewNetwork', wifi_key='newpassword')
+config.update_config(x_pin=34, y_pin=35)   # controller only
 ```
 
-**Linux / macOS**
+Changes take effect on the next boot. Reset after editing: `mpremote reset`.
 
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install mpremote==1.28.0
-```
-
-**Debian / Ubuntu** — the system Python is often too old. Install Python 3.12 via the `deadsnakes` PPA:
-
-```bash
-sudo add-apt-repository ppa:deadsnakes/ppa
-sudo apt update
-sudo apt install python3.12 python3.12-venv
-
-python3.12 -m venv venv
-source venv/bin/activate
-pip install mpremote==1.28.0
-```
-
-Activate the virtual environment each time before using `mpremote`.
-
-### 2. Set the WebREPL password
-
-```bash
-mpremote exec "import webrepl_setup"
-```
-
-Follow the prompts to enable WebREPL and set a password. This writes `webrepl_cfg.py` directly to the device filesystem. The file is device-generated and is not tracked in the repository.
-
-> **Note:** the password in `webrepl_cfg.py` is used only to authenticate connections to the board over WebREPL. It is separate from your WiFi password.
-
-### 3. Install aioespnow
-
-```bash
-mpremote mip install aioespnow
-```
-
-### 4. Create config files
-
-```bash
-# WiFi credentials (shared by both boards)
-cp src/wifi.json.example src/wifi.json
-# edit src/wifi.json
-
-# Board-specific config (peer MAC, pins)
-cp src/<board>/config.json.example src/<board>/config.json
-# edit src/<board>/config.json
-```
-
-`deploy.sh` merges both into the file pushed to the device.
-
-### 5. Deploy the firmware
-
-See [Deploy the robot firmware](#deploy-the-robot-firmware) or [Deploy the controller firmware](#deploy-the-controller-firmware) below.
-
-## Deploying with mpremote
-
-[`mpremote`](https://docs.micropython.org/en/latest/reference/mpremote.html) is the recommended tool for interacting with the device over USB.
-
-### Install
-
-```bash
-pip install mpremote
-```
-
-### Connect to the REPL
-
-```bash
-mpremote
-```
-
-Press `Ctrl+]` to exit.
-
-### Deploy the robot firmware
-
-**Linux / macOS**
-
-```bash
-./deploy.sh robot
-```
-
-**Windows**
-
-```bat
-deploy.bat robot
-```
-
-### Deploy the controller firmware
-
-**Linux / macOS**
-
-```bash
-./deploy.sh controller
-```
-
-**Windows**
-
-```bat
-deploy.bat controller
-```
-
-The deploy scripts copy shared files (`boot.py`, `config.py`, `lib/queue.py`) from `src/shared/` first, then board-specific files (`main.py`, `config.json`, and for the robot `lib/dcmotor.py` and `lib/mecanum.py`) on top.
-
-If more than one USB serial device is connected, specify the port explicitly with `-u`:
-
-```bash
-# Linux / macOS
-./deploy.sh robot -u /dev/ttyUSB1
-./deploy.sh controller -u /dev/ttyACM0
-```
-
-```bat
-:: Windows
-deploy.bat robot -u COM3
-deploy.bat controller -u COM4
-```
-
-On Linux/macOS, if `-u` is omitted and multiple devices are detected, the script warns and lists available ports before proceeding.
-
-### Updating a file on the device
-
-Use this to push a single changed `.py` file or an updated `config.json` without a full redeploy:
-
-```bash
-# Update a Python file and reset
-mpremote cp main.py :main.py + reset
-
-# Update config.json (no reset needed — read on next boot/run)
-mpremote cp config.json :config.json
-```
-
-To edit `config.json` directly on the device without touching the local copy:
+### Via mpremote exec directly
 
 ```bash
 mpremote exec "
@@ -339,171 +343,120 @@ with open('config.json') as f:
 cfg['wifi_on_boot'] = True
 with open('config.json', 'w') as f:
     ujson.dump(cfg, f)
-print('done')
 "
 ```
 
-### Editing config.json via WebREPL
+---
 
-`config.py` exposes two helpers designed for use in the WebREPL console:
+## WebREPL
 
-**`write_config(ssid, key, **kwargs)`** — creates or fully overwrites `config.json`. Use this for initial setup or when you want a clean slate.
+Once a board is connected to WiFi, you can access it wirelessly via the [WebREPL client](https://micropython.org/webrepl/).
 
-```python
-import config
+The password in `webrepl_cfg.py` is used only to authenticate connections to the board over WebREPL — it is separate from your WiFi password.
 
-# Robot: set WiFi credentials and the controller's MAC address
-config.write_config('MyNetwork', 'mypassword', peer_mac_address='AA:BB:CC:DD:EE:FF')
-
-# Controller: same, plus joystick pin overrides
-config.write_config('MyNetwork', 'mypassword', peer_mac_address='AA:BB:CC:DD:EE:FF', x_pin=34, y_pin=35)
-```
-
-**`update_config(**kwargs)`** — merges one or more keys into the existing `config.json`, leaving everything else untouched. Use this to change a single setting without rewriting the whole file.
-
-```python
-import config
-
-# Change the peer MAC address only
-config.update_config(peer_mac_address='AA:BB:CC:DD:EE:FF')
-
-# Update WiFi credentials
-config.update_config(wifi_ssid='NewNetwork', wifi_key='newpassword')
-
-# Remap joystick pins (controller only)
-config.update_config(x_pin=34, y_pin=35)
-```
-
-> **Note:** changes take effect on the next boot. Soft-reset the board after editing: `mpremote reset` or press the reset button.
-
-### Other useful commands
-
-```bash
-# List files on device
-mpremote ls
-
-# Run a file without copying
-mpremote run main.py
-
-# Copy a single file
-mpremote cp config.json :config.json
-
-# Delete a file
-mpremote rm :somefile.py
-
-# Soft reset
-mpremote reset
-
-# Run a one-liner
-mpremote exec "import os; print(os.listdir())"
-
-# Chain commands
-mpremote cp config.json :config.json + reset
-```
-
-### WebREPL
-
-Once the device is on WiFi, connect wirelessly via the [WebREPL client](https://micropython.org/webrepl/). The password is set in `webrepl_cfg.py` — this is only used to authenticate access to the board over WebREPL, not your WiFi password. To configure it fresh:
+To set or reset the WebREPL password:
 
 ```bash
 mpremote exec "import webrepl_setup"
 ```
 
-## Provisioning a New Device with provision.sh
+To enable WiFi (and WebREPL) on boot, set `"wifi_on_boot": true` in the board's `config.json` and redeploy.
 
-`provision/provision.sh` prepares a bare ESP32 for development — it optionally flashes MicroPython firmware, then deploys a minimal baseline (`boot.py`, `config.py`, `config.json`, `webrepl_cfg.py`, `lib/`) that gives you a working WebREPL and the config helpers.
+---
 
-**This is not the project firmware.** After provisioning, deploy the robot or controller files separately — see [Deploy the robot firmware](#deploy-the-robot-firmware) and [Deploy the controller firmware](#deploy-the-controller-firmware).
-
-### Prerequisites
+## mpremote Cheatsheet
 
 ```bash
-pip install mpremote          # always required
-pip install esptool           # only needed when flashing firmware (-p)
+mpremote                                  # open REPL (Ctrl+] to exit)
+mpremote ls                               # list files on device
+mpremote cp main.py :main.py + reset      # push file and reset
+mpremote cp config.json :config.json      # push config (no reset needed)
+mpremote rm :somefile.py                  # delete a file
+mpremote reset                            # soft reset
+mpremote run main.py                      # run without copying
+mpremote exec "import os; print(os.listdir())"
+mpremote connect /dev/ttyUSB1 ls         # target a specific port
 ```
 
-### 1. Prepare the skeleton files
+---
+
+## Dependencies
+
+Install on each device via `mip`, or copy manually:
 
 ```bash
-cd provision
-
-# Create config.json from the example and fill in your WiFi credentials
-cp skel/config.json.example skel/config.json
-# edit skel/config.json
-
-# Create webrepl_cfg.py (gitignored — set your own password)
-echo "PASS = 'your-password'" > skel/webrepl_cfg.py
+mpremote mip install aioespnow
 ```
 
-### 2. (Optional) Download MicroPython firmware
+- [`aioespnow`](https://github.com/glenn20/micropython-espnow) — async ESP-NOW wrapper (both boards)
 
-Only needed if flashing a bare or bricked board. Download the correct `.bin` for your ESP32 variant from:
+---
 
-**<https://micropython.org/download/ESP32_GENERIC/>**
+## Architecture
 
-As of 2026-04-19, the latest release is **v1.28.0**:
+### Communication
 
-```bash
-# curl
-curl -O https://micropython.org/resources/firmware/ESP32_GENERIC-20260406-v1.28.0.bin
+Controller and robot communicate over **ESP-NOW** (Wi-Fi layer 2, no router needed). Both boards must be on the same channel (`WIFI_CHANNEL = 11`). Commands are JSON objects with values in `[-1.0, 1.0]`:
 
-# wget
-wget https://micropython.org/resources/firmware/ESP32_GENERIC-20260406-v1.28.0.bin
+```json
+{"throttle": 0.5, "strafe": 0.0, "rotate": 0.0}
 ```
 
-Place the downloaded file in the `provision/` folder before running the script.
+Add `"queued": true` to route into the scripted FIFO queue instead of the live register. The scripted queue takes priority — the live register is ignored while commands are queued.
 
-| Variant | Board |
+The joystick button toggles between **rotate mode** (X axis turns the robot) and **strafe mode** (X axis slides sideways). The LED blinks fast in strafe mode, slow in rotate mode.
+
+### Robot tasks (`src/robot/main.py`)
+
+| Task | Role |
 |---|---|
-| `ESP32_GENERIC` | Standard ESP32 (most dev boards) |
-| `ESP32_GENERIC_S2` | ESP32-S2 |
-| `ESP32_GENERIC_S3` | ESP32-S3 |
-| `ESP32_GENERIC_C3` | ESP32-C3 |
+| `receive_messages` | Receives ESP-NOW packets; routes to queue or live register |
+| `control_loop` | Drives motors at 50 Hz from the live register |
+| `handle_task` | Drains the scripted FIFO queue; takes priority over `control_loop` |
+| `monitor_activity` | Watchdog — stops motors after 10 s of silence |
+| `monitor_button` | GPIO0 boot button triggers a clean shutdown |
 
-Place the downloaded `.bin` file in the `provision/` folder. The script picks the newest one automatically.
+### Controller tasks (`src/controller/main.py`)
 
-### 3. Run the script
-
-**Deploy skeleton files only** (device already has MicroPython):
-
-```bash
-./provision.sh
-```
-
-**Flash firmware then deploy** (bare or bricked board):
-
-```bash
-# Single USB device connected
-./provision.sh -p
-
-# Multiple USB devices connected — specify the correct port
-./provision.sh -p --usb /dev/ttyUSB1
-```
-
-**Options:**
-
-| Flag | Description |
+| Task | Role |
 |---|---|
-| `-p` / `--program` | Erase flash and write MicroPython before deploying |
-| `-u` / `--usb PORT` | Serial port for esptool (e.g. `/dev/ttyUSB1`, `/dev/ttyACM0`) |
-| `-d` / `--debug` | Enable bash `-x` tracing |
+| `read_joystick_task` | Reads ADC, normalizes values, sends ESP-NOW packets |
+| `blink_led` | Indicates current X-axis mode via blink pattern |
+| `monitor_button` | GPIO0 boot button triggers a clean shutdown |
 
-> **Tip:** if multiple USB serial devices are connected and `--usb` is omitted, the script warns and lists available ports before proceeding.
+`DebouncedADC` averages 50 raw samples per read and applies an EMA filter. Values are quantised to 0.05 steps to suppress jitter. A reading of `65535` is treated as a joystick button press (mode toggle), not an axis value.
 
-### 4. After provisioning
+---
 
-The board now has a working WebREPL and the config helpers. Next steps:
+## Repository Layout
 
-1. Connect via WebREPL or `mpremote` and write your `config.json`:
-
-```python
-# In WebREPL or: mpremote exec "..."
-import config
-config.write_config('MyNetwork', 'mypassword', peer_mac_address='AA:BB:CC:DD:EE:FF')
+```
+setup.sh              # interactive pairing wizard (first-time setup)
+deploy.sh             # assembles shared + board files and deploys via mpremote
+deploy.bat            # Windows equivalent of deploy.sh
+provision/
+  provision.sh        # flashes MicroPython and deploys baseline (bare boards)
+  skel/               # baseline files deployed by provision.sh
+src/
+  wifi.json.example   # WiFi credentials template (copy to wifi.json, gitignored)
+  shared/
+    boot.py           # boot sequence (shared by both boards)
+    config.py         # WiFi/config helpers (shared by both boards)
+    lib/
+      queue.py        # async queue (shared by both boards)
+  robot/
+    main.py           # asyncio entry point
+    config.json.example
+    lib/
+      dcmotor.py      # DCMotor factory + TB6612FNG and MX1508 drivers
+      mecanum.py      # mecanum kinematics
+  controller/
+    main.py           # asyncio entry point
+    config.json.example
 ```
 
-2. Deploy the actual project firmware — see [Deploy the robot firmware](#deploy-the-robot-firmware) or [Deploy the controller firmware](#deploy-the-controller-firmware).
+---
 
 ## Emergency Stop
 
-Press the **boot button** (GPIO0) on either board to trigger a clean shutdown. On the robot, all motors stop and WebREPL is re-enabled.
+Press the **boot button** (GPIO0) on either board for a clean shutdown. On the robot, all motors stop immediately.
