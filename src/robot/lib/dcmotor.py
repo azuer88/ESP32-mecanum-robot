@@ -10,7 +10,8 @@ MAX_V = int(65535 * 0.8)
 MIN_V = 41200
 
 # Safe PWM-capable GPIO ranges on ESP32 (avoid pins tied to flash/PSRAM)
-_SAFE_PWM_RANGES = ((16, 19), (21, 23), (25, 27))
+# _SAFE_PWM_RANGES = ((16, 19), (21, 23), (25, 27))
+_SAFE_PWM_RANGES = tuple(range(16, 19+1)) + tuple(range(21, 23+1)) + tuple(range(25, 27+1))
 
 
 def pwr_to_duty(power: float) -> int:
@@ -18,7 +19,7 @@ def pwr_to_duty(power: float) -> int:
 
 
 def is_pwm_safe(pin: int, print_warning: bool = True) -> bool:
-    safe = any(lo <= pin <= hi for lo, hi in _SAFE_PWM_RANGES)
+    safe = pin in _SAFE_PWM_RANGES
     if not safe and print_warning:
         print(f"WARNING: Pin {pin} may not be safe for PWM.")
     return safe
