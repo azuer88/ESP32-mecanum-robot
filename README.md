@@ -252,19 +252,33 @@ Press `Ctrl+]` to exit.
 
 ### Deploy the robot firmware
 
+**Linux / macOS**
+
 ```bash
-cd src/robot
-mpremote cp boot.py main.py config.py config.json mecanum.json webrepl_cfg.py : \
-  + cp -r lib/ :lib/
+./deploy.sh robot
+```
+
+**Windows**
+
+```bat
+deploy.bat robot
 ```
 
 ### Deploy the controller firmware
 
+**Linux / macOS**
+
 ```bash
-cd src/controller
-mpremote cp boot.py main.py config.py config.json webrepl_cfg.py : \
-  + cp -r lib/ :lib/
+./deploy.sh controller
 ```
+
+**Windows**
+
+```bat
+deploy.bat controller
+```
+
+The deploy scripts copy shared files (`boot.py`, `config.py`, `lib/queue.py`) from `src/shared/` first, then board-specific files (`main.py`, `config.json`, and for the robot `lib/dcmotor.py` and `lib/mecanum.py`) on top.
 
 ### Updating a file on the device
 
