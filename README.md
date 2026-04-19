@@ -361,7 +361,9 @@ mpremote exec "import webrepl_setup"
 
 ## Provisioning a New Device with provision.sh
 
-`provision/provision.sh` automates first-time setup: optionally flashes MicroPython firmware, then deploys the baseline skeleton files (`boot.py`, `config.py`, `config.json`, `webrepl_cfg.py`, `lib/`).
+`provision/provision.sh` prepares a bare ESP32 for development — it optionally flashes MicroPython firmware, then deploys a minimal baseline (`boot.py`, `config.py`, `config.json`, `webrepl_cfg.py`, `lib/`) that gives you a working WebREPL and the config helpers.
+
+**This is not the project firmware.** After provisioning, deploy the robot or controller files separately — see [Deploy the robot firmware](#deploy-the-robot-firmware) and [Deploy the controller firmware](#deploy-the-controller-firmware).
 
 ### Prerequisites
 
@@ -440,15 +442,17 @@ Place the downloaded `.bin` file in the `provision/` folder. The script picks th
 
 ### 4. After provisioning
 
-Reset the board, then use WebREPL or `mpremote` to write the project-specific `config.json`:
+The board now has a working WebREPL and the config helpers. Next steps:
+
+1. Connect via WebREPL or `mpremote` and write your `config.json`:
 
 ```python
-# In WebREPL or mpremote exec
+# In WebREPL or: mpremote exec "..."
 import config
 config.write_config('MyNetwork', 'mypassword', peer_mac_address='AA:BB:CC:DD:EE:FF')
 ```
 
-Then deploy the robot or controller firmware as described in [Deploying with mpremote](#deploying-with-mpremote).
+2. Deploy the actual project firmware — see [Deploy the robot firmware](#deploy-the-robot-firmware) or [Deploy the controller firmware](#deploy-the-controller-firmware).
 
 ## Emergency Stop
 
