@@ -7,6 +7,7 @@ network_config = None
 main_config = None
 
 
+# Write a new config.json with WiFi credentials and any extra kwargs.
 def write_config(ssid, key, **kwargs):
     data = {
         "wifi_ssid": ssid,
@@ -22,6 +23,7 @@ def write_config(ssid, key, **kwargs):
         print(f"Error writing config: {e}")
 
 
+# Merge kwargs into the existing config.json, preserving all other keys.
 def update_config(**kwargs):
     try:
         with open("config.json", "r") as f:
@@ -39,6 +41,8 @@ def update_config(**kwargs):
         print(f"Error updating config: {e}")
 
 
+# Load config.json into main_config (cached after first call).
+# Returns an empty dict if the file is missing or contains invalid JSON.
 def load_config():
     global main_config
 
@@ -58,6 +62,9 @@ def load_config():
     return main_config
 
 
+# Connect to WiFi using credentials from main_config.
+# Retries up to 10 times (5 s each) and aborts early on terminal error codes.
+# Removes wifi_key from main_config after a successful connection.
 def do_connect():
     global network_config
     global main_config
@@ -103,6 +110,8 @@ def do_connect():
         print('network config failed — continuing without WiFi.')
 
 
+# Connect to WiFi then start WebREPL.
+# Pass reload_config=True to re-read config.json before connecting.
 def start_webrepl(reload_config=False):
     if reload_config:
         load_config()

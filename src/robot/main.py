@@ -25,21 +25,22 @@ stop_event = asyncio.Event()
 led = Pin(2, Pin.OUT)
 action_event = asyncio.Event()
 
+# FIFO queue for scripted motor commands (takes priority over live joystick)
 main_queue = queue.Queue(10)
 
 mecanum = MecanumDrive()
 mecanum.load_cfg()
 
-TIMEOUT_S = 10  # 10 seconds
+TIMEOUT_S = 10  # 10 seconds inactivity before motors are stopped
 
 _DRIVE_KEYS = {'throttle', 'strafe', 'rotate'}
 # Latest joystick command; overwritten on each live message, read by control_loop
 _current_cmd = {"throttle": 0.0, "strafe": 0.0, "rotate": 0.0}
 
 
-# --- Setup Wi-Fi and ESP-NOW ---
+# Initialise the Wi-Fi interface in station mode and set up ESP-NOW.
+# Raises OSError if ESP-NOW cannot be activated or the peer cannot be added.
 def setup_espnow():
-    """Initializes the Wi-Fi interface and ESP-NOW."""
     sta = network.WLAN(network.STA_IF)
     sta.active(False)  # ensure it is disabled
     sta.active(True)
@@ -59,8 +60,8 @@ def setup_espnow():
     return e
 
 
+# Poll the boot button (GPIO0); set stop_event when pressed to trigger shutdown.
 async def monitor_button():
-    """Monitors the boot button and sets the stop_event when pressed."""
     print("Monitoring boot button...")
     while True:
         if boot_button_pin.value() == 0:
@@ -72,8 +73,12 @@ async def monitor_button():
     print("Monitoring button stopped.")
 
 
+# Receive ESP-NOW messages and route them:
+#   "BYE"            -> set stop_event
+#   queued=True      -> push drive command to main_queue (scripted sequence)
+#   queued=False/absent -> overwrite _current_cmd (live joystick)
+# Sets action_event on each received message to reset the inactivity timer.
 async def receive_messages(espnow: aioespnow.AIOESPNOW):
-    """Listens for incoming messages and routes them to queue or live register."""
     print("Starting receiving messages")
     try:
         while not stop_event.is_set():
@@ -115,6 +120,8 @@ async def receive_messages(espnow: aioespnow.AIOESPNOW):
         print("Receiving messages done")
 
 
+# Watch for inactivity: if no message arrives within TIMEOUT_S seconds,
+# zero _current_cmd and stop all motors to prevent runaway on signal loss.
 async def monitor_activity():
     while True:
         action_event.clear()
@@ -128,8 +135,9 @@ async def monitor_activity():
             mecanum.stop()
 
 
+# Apply live joystick commands at 50 Hz when the scripted queue is empty.
+# When main_queue has items, handle_task drives the motors instead.
 async def control_loop():
-    """Applies live joystick commands at a fixed rate when no scripted queue is active."""
     while not stop_event.is_set():
         if main_queue.empty():
             mecanum.drive(**_current_cmd)
@@ -137,8 +145,9 @@ async def control_loop():
         await asyncio.sleep_ms(20)  # 50 Hz
 
 
+# Drain the scripted FIFO queue and apply each command in order.
+# Non-empty queue suppresses control_loop, giving scripted sequences priority.
 async def handle_task():
-    """Processes scripted commands from the FIFO queue; takes priority over live control."""
     while True:
         item = await main_queue.get()
         print(f"command: ({type(item)}) - {item}")
