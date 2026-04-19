@@ -456,8 +456,10 @@ The joystick button toggles between **rotate mode** (X axis turns the robot) and
 ## Repository Layout
 
 ```
-setup.sh              # interactive pairing wizard (first-time setup)
-recover.sh            # recover local config files from boards already deployed
+setup.sh / setup.py   # interactive pairing wizard (first-time setup)
+setup.bat             # Windows launcher for setup.py
+recover.sh / recover.py  # recover local config files from boards already deployed
+recover.bat           # Windows launcher for recover.py
 deploy.sh             # assembles shared + board files and deploys via mpremote
 deploy.bat            # Windows equivalent of deploy.sh
 provision/
