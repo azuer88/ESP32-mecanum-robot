@@ -26,7 +26,7 @@ MicroPython firmware for an ESP32-based mecanum wheel robot controlled via ESP-N
 
 ## Getting Started
 
-Choose the path that matches your boards:
+Use the [Configurator GUI](#configurator-gui) for a point-and-click experience, or choose the command-line path that matches your boards:
 
 ### Path A — Bare boards (no MicroPython yet)
 
