@@ -371,17 +371,34 @@ class _BoardTab(ttk.Frame):
         self._status_var = tk.StringVar()
         self._status_var.trace_add("write", self._on_status_change)
 
-        frm = ttk.Frame(self)
-        frm.pack(fill="x", pady=(4, 0))
-
-        ttk.Button(frm, text="Clear", command=self._clear_log).pack(side="right")
-
         self._log_widget = scrolledtext.ScrolledText(
-            frm, height=4, state="disabled", wrap="word",
+            self, height=4, state="disabled", wrap="word",
             font=("Courier", 9), relief="flat", background="#f5f5f5",
         )
-        self._log_widget.pack(fill="x", side="left", expand=True)
+        self._log_widget.pack(fill="both", expand=True)
+        self._log_widget.bind("<Button-3>", self._show_log_menu)
         self._log("Select a port to begin.")
+
+    def _show_log_menu(self, event):
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Copy selection", command=self._copy_selection)
+        menu.add_command(label="Copy all", command=self._copy_all)
+        menu.add_separator()
+        menu.add_command(label="Clear", command=self._clear_log)
+        menu.tk_popup(event.x_root, event.y_root)
+
+    def _copy_selection(self):
+        try:
+            text = self._log_widget.get("sel.first", "sel.last")
+        except tk.TclError:
+            return
+        self.clipboard_clear()
+        self.clipboard_append(text)
+
+    def _copy_all(self):
+        text = self._log_widget.get("1.0", "end-1c")
+        self.clipboard_clear()
+        self.clipboard_append(text)
 
     def _log(self, msg):
         ts = datetime.now().strftime("%H:%M:%S")
@@ -637,8 +654,8 @@ class FlashTab(ttk.Frame):
         self._build_connection()
         self._build_firmware()
         self._build_actions()
-        self._build_status()
         self._refresh_local()
+        self._build_status()
 
     # ── Connection ──────────────────────────────────────────────────────────
 
@@ -792,17 +809,34 @@ class FlashTab(ttk.Frame):
         self._status_var = tk.StringVar()
         self._status_var.trace_add("write", self._on_status_change)
 
-        frm = ttk.Frame(self)
-        frm.pack(fill="x", pady=(4, 0))
-
-        ttk.Button(frm, text="Clear", command=self._clear_log).pack(side="right")
-
         self._log_widget = scrolledtext.ScrolledText(
-            frm, height=4, state="disabled", wrap="word",
+            self, height=4, state="disabled", wrap="word",
             font=("Courier", 9), relief="flat", background="#f5f5f5",
         )
-        self._log_widget.pack(fill="x", side="left", expand=True)
+        self._log_widget.pack(fill="both", expand=True)
+        self._log_widget.bind("<Button-3>", self._show_log_menu)
         self._log("Select a port and firmware to begin.")
+
+    def _show_log_menu(self, event):
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Copy selection", command=self._copy_selection)
+        menu.add_command(label="Copy all", command=self._copy_all)
+        menu.add_separator()
+        menu.add_command(label="Clear", command=self._clear_log)
+        menu.tk_popup(event.x_root, event.y_root)
+
+    def _copy_selection(self):
+        try:
+            text = self._log_widget.get("sel.first", "sel.last")
+        except tk.TclError:
+            return
+        self.clipboard_clear()
+        self.clipboard_append(text)
+
+    def _copy_all(self):
+        text = self._log_widget.get("1.0", "end-1c")
+        self.clipboard_clear()
+        self.clipboard_append(text)
 
     def _log(self, msg):
         ts = datetime.now().strftime("%H:%M:%S")
