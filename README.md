@@ -65,7 +65,7 @@ The boards are paired and working but you don't have the local config files (e.g
 ./recover.sh
 ```
 
-**Windows**
+**Windows** *(untested, but should work)*
 
 ```bat
 recover.bat
@@ -99,7 +99,7 @@ source venv/bin/activate
 pip install mpremote==1.28.0
 ```
 
-**Windows** — Python 3.12 recommended, download from [python.org](https://www.python.org/downloads/windows/).
+**Windows** *(untested, but should work)* — Python 3.12 recommended, download from [python.org](https://www.python.org/downloads/windows/).
 
 ```bat
 python -m venv venv
@@ -189,7 +189,7 @@ After provisioning both boards, continue to the next section.
 ./setup.sh
 ```
 
-**Windows**
+**Windows** *(untested, but should work)*
 
 ```bat
 setup.bat
@@ -222,7 +222,7 @@ Use `deploy.sh` to push updated firmware to a board after the initial pairing is
 ./deploy.sh robot
 ./deploy.sh controller
 
-# Windows
+# Windows (untested, but should work)
 deploy.bat robot
 deploy.bat controller
 ```
@@ -489,7 +489,7 @@ pip install -r requirements.txt
 python3 configurator.py
 ```
 
-Build a Windows executable on a Windows machine:
+Build a Windows executable on a Windows machine *(untested, but should work)*:
 
 ```bat
 cd src\configurator

@@ -21,11 +21,11 @@ Use the virtualenv at `/home/lou/.virtualenvs/micropython2` for `mpremote`.
 ```bash
 # First time: pair both boards end-to-end (handles MACs, WiFi, deploy)
 ./setup.sh          # Linux/macOS
-# setup.bat         # Windows
+# setup.bat         # Windows (untested, but should work)
 
 # Recover local config files from boards already deployed (e.g. on a new machine)
 ./recover.sh        # Linux/macOS
-# recover.bat       # Windows
+# recover.bat       # Windows (untested, but should work)
 
 # Deploy robot firmware
 ./deploy.sh robot
@@ -54,7 +54,7 @@ Three tabs:
 WiFi SSID/password are shared `tk.StringVar` instances between Controller and Robot tabs — reading either board fills the other. Hardware MACs are similarly tracked cross-tab to support the peer MAC pre-flight check.
 
 Run: `python3 src/configurator/configurator.py`
-Build Windows exe: `cd src/configurator && build.bat`
+Build Windows exe: `cd src/configurator && build.bat` *(untested, but should work)*
 
 ## Provisioning a bare board
 
