@@ -87,7 +87,7 @@ def get_mac(port: str | None = None) -> str | None:
     args += ['exec',
         "import network; w=network.WLAN(0); w.active(True); "
         "print(':'.join('%02X'%b for b in w.config('mac')))"]
-    result = subprocess.run(args, capture_output=True, text=True)
+    result = subprocess.run(args, capture_output=True, text=True, stdin=subprocess.DEVNULL)
     match = re.search(r'([0-9A-F]{2}:){5}[0-9A-F]{2}', result.stdout + result.stderr)
     return match.group(0) if match else None
 
