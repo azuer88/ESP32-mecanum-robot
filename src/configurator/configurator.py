@@ -519,7 +519,7 @@ class ControllerTab(_BoardTab):
             if y is not None:
                 config["y_pin"] = y
             _write_to_device(port, "wifi.json", json.dumps(wifi, indent=2))
-            _write_to_device(port, "config.json", json.dumps(config, indent=2))
+            _write_to_device(port, "config.json", json.dumps({**wifi, **config}, indent=2))
             self.after(0, lambda: self._status_var.set("Write complete."))
         except Exception as exc:
             msg = f"Write error: {exc}"
@@ -634,7 +634,7 @@ class RobotTab(_BoardTab):
                 mecanum[motor] = entry
 
             _write_to_device(port, "wifi.json", json.dumps(wifi, indent=2))
-            _write_to_device(port, "config.json", json.dumps(config, indent=2))
+            _write_to_device(port, "config.json", json.dumps({**wifi, **config}, indent=2))
             _write_to_device(port, "mecanum.json", json.dumps(mecanum, indent=2))
             self.after(0, lambda: self._status_var.set("Write complete."))
         except Exception as exc:
