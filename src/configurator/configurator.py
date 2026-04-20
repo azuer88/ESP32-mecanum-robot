@@ -28,6 +28,17 @@ MPREMOTE = _find_mpremote()
 
 MOTORS = ["fl", "fr", "rl", "rr"]
 
+def _parse_pin(value, field_name):
+    """Return int pin value, None if blank, or raise ValueError for non-numeric."""
+    s = value.strip()
+    if not s:
+        return None
+    try:
+        return int(s)
+    except ValueError:
+        raise ValueError(f"Invalid pin value for {field_name}: {s!r}")
+
+
 MOTOR_LABELS = {
     "fl": "Front Left",
     "fr": "Front Right",
@@ -500,11 +511,13 @@ class ControllerTab(_BoardTab):
                 "wifi_ssid": self._ssid_var.get(),
                 "wifi_key": self._wifi_key_var.get(),
             }
-            config = {
-                "peer_mac_address": self._peer_mac_var.get(),
-                "x_pin": int(self._x_pin_var.get()),
-                "y_pin": int(self._y_pin_var.get()),
-            }
+            config: dict[str, object] = {"peer_mac_address": self._peer_mac_var.get()}
+            x = _parse_pin(self._x_pin_var.get(), "X Axis Pin")
+            y = _parse_pin(self._y_pin_var.get(), "Y Axis Pin")
+            if x is not None:
+                config["x_pin"] = x
+            if y is not None:
+                config["y_pin"] = y
             _write_to_device(port, "wifi.json", json.dumps(wifi, indent=2))
             _write_to_device(port, "config.json", json.dumps(config, indent=2))
             self.after(0, lambda: self._status_var.set("Write complete."))
@@ -613,13 +626,11 @@ class RobotTab(_BoardTab):
             config = {"peer_mac_address": self._peer_mac_var.get()}
             mecanum = {}
             for motor, vars_dict in self._motor_vars.items():
-                entry = {
-                    "pin1": int(vars_dict["pin1"].get()),
-                    "pin2": int(vars_dict["pin2"].get()),
-                }
-                ep = vars_dict["enable_pin"].get().strip()
-                if ep:
-                    entry["enable_pin"] = int(ep)
+                entry = {}
+                for field in ("pin1", "pin2", "enable_pin"):
+                    v = _parse_pin(vars_dict[field].get(), f"{motor} {field}")
+                    if v is not None:
+                        entry[field] = v
                 mecanum[motor] = entry
 
             _write_to_device(port, "wifi.json", json.dumps(wifi, indent=2))
