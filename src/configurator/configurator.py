@@ -128,6 +128,7 @@ class _BoardTab(ttk.Frame):
         self._wifi_key_var = shared_wifi_key or tk.StringVar()
         self._own_mac_var = own_mac_var or tk.StringVar()
         self._peer_hw_mac_var = peer_hw_mac_var or tk.StringVar()
+        self._device_read = False
         self._build_connection()
         self._build_info()
         self._build_config()
@@ -165,6 +166,7 @@ class _BoardTab(ttk.Frame):
             self._update_action_state()
 
     def _on_port_selected(self, event=None):
+        self._device_read = False
         self._update_action_state()
 
     # Subclasses set this to "controller" or "robot"
@@ -191,6 +193,7 @@ class _BoardTab(ttk.Frame):
                     )
                 else:
                     msg = f"OK — {port} is a {detected} running {impl}."
+                self._device_read = True
                 self.after(0, lambda: self._set_info(data))
                 self.after(0, lambda: self._populate_fields(data))
                 self.after(0, lambda: self._status_var.set(msg))
@@ -283,7 +286,7 @@ class _BoardTab(ttk.Frame):
         self._firmware_btn.pack(side="left")
 
     def _update_action_state(self):
-        state = "normal" if self._port_var.get() else "disabled"
+        state = "normal" if (self._port_var.get() and self._device_read) else "disabled"
         self._write_btn.config(state=state)
         self._firmware_btn.config(state=state)
 
