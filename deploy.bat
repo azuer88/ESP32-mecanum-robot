@@ -10,6 +10,7 @@
 ::   mpremote   pip install mpremote
 ::
 :: Before running:
+::   - Copy src\wifi.json.example to src\wifi.json and add WiFi credentials
 ::   - Edit src\<board>\config.json (copied from config.json.example)
 ::   - For the robot, also create mecanum.json on the device
 
@@ -18,6 +19,7 @@ setlocal enabledelayedexpansion
 set "SCRIPT_DIR=%~dp0"
 set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
 set "SHARED_DIR=%SCRIPT_DIR%\src\shared"
+set "WIFI_JSON=%SCRIPT_DIR%\src\wifi.json"
 set "USB_PORT="
 
 set "BOARD=%~1"
@@ -58,6 +60,7 @@ exit /b 1
 :args_done
 
 set "BOARD_DIR=%SCRIPT_DIR%\src\%BOARD%"
+set "BOARD_CONFIG=%BOARD_DIR%\config.json"
 
 where mpremote >nul 2>&1
 if errorlevel 1 (
@@ -65,9 +68,23 @@ if errorlevel 1 (
     exit /b 1
 )
 
-if not exist "%BOARD_DIR%\config.json" (
-    echo ERROR: %BOARD_DIR%\config.json not found.
+if not exist "%WIFI_JSON%" (
+    echo ERROR: src\wifi.json not found.
+    echo   Copy src\wifi.json.example to src\wifi.json and fill in your WiFi credentials.
+    exit /b 1
+)
+
+if not exist "%BOARD_CONFIG%" (
+    echo ERROR: %BOARD_CONFIG% not found.
     echo   Copy config.json.example to config.json and fill in your values.
+    exit /b 1
+)
+
+:: Merge wifi.json + board config.json into a temp file (board-specific keys win).
+set "MERGED_CONFIG=%TEMP%\robot_config_%RANDOM%.json"
+python -c "import json; w=json.load(open(r'%WIFI_JSON%')); b=json.load(open(r'%BOARD_CONFIG%')); json.dump({**w,**b},open(r'%MERGED_CONFIG%','w'))"
+if errorlevel 1 (
+    echo ERROR: failed to merge config files
     exit /b 1
 )
 
@@ -79,14 +96,26 @@ if not "%USB_PORT%"=="" echo   Port: %USB_PORT%
 
 cd /d "%SHARED_DIR%"
 %MPREMOTE% resume cp boot.py config.py :/ + cp -r lib :/
-if errorlevel 1 exit /b 1
+if errorlevel 1 (del "%MERGED_CONFIG%" 2>nul & exit /b 1)
 
 cd /d "%BOARD_DIR%"
 if "%BOARD%"=="robot" (
-    %MPREMOTE% resume cp main.py config.json : + cp -r lib/ :lib/
+    %MPREMOTE% resume cp main.py : ^
+        + cp "%MERGED_CONFIG%" :config.json ^
+        + cp -r lib/. :lib/
+    if errorlevel 1 (del "%MERGED_CONFIG%" 2>nul & exit /b 1)
+    if exist "%BOARD_DIR%\mecanum.json" (
+        %MPREMOTE% resume cp mecanum.json :mecanum.json
+        if errorlevel 1 (del "%MERGED_CONFIG%" 2>nul & exit /b 1)
+    ) else (
+        echo WARNING: src\robot\mecanum.json not found -- motors will not initialise.
+        echo   Copy src\robot\mecanum.json.example to src\robot\mecanum.json and fill in pin numbers.
+    )
 ) else (
-    %MPREMOTE% resume cp main.py config.json :
+    %MPREMOTE% resume cp main.py : ^
+        + cp "%MERGED_CONFIG%" :config.json
+    if errorlevel 1 (del "%MERGED_CONFIG%" 2>nul & exit /b 1)
 )
-if errorlevel 1 exit /b 1
 
+del "%MERGED_CONFIG%" 2>nul
 echo Done. Reset the device to apply: %MPREMOTE% reset

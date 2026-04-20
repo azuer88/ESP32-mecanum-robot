@@ -94,6 +94,36 @@ def _write_to_device(port, remote_path, content, timeout=15):
         os.unlink(path)
 
 
+def _cp(port, local_path, remote_path, timeout=30):
+    r = subprocess.run(
+        MPREMOTE + ["connect", port, "resume", "cp", local_path, remote_path],
+        capture_output=True, text=True, timeout=timeout,
+    )
+    if r.returncode != 0:
+        detail = r.stderr.strip().splitlines()[-1] if r.stderr.strip() else "mpremote failed"
+        raise RuntimeError(detail)
+
+
+def _cp_dir(port, local_dir, remote_parent, timeout=30):
+    r = subprocess.run(
+        MPREMOTE + ["connect", port, "resume", "cp", "-r", local_dir, remote_parent],
+        capture_output=True, text=True, timeout=timeout,
+    )
+    if r.returncode != 0:
+        detail = r.stderr.strip().splitlines()[-1] if r.stderr.strip() else "mpremote failed"
+        raise RuntimeError(detail)
+
+
+def _deploy_shared(port, src_root):
+    shared = os.path.join(src_root, "shared")
+    for fname in sorted(os.listdir(shared)):
+        if fname.endswith(".py"):
+            _cp(port, os.path.join(shared, fname), f":/{fname}")
+    lib = os.path.join(shared, "lib")
+    if os.path.isdir(lib):
+        _cp_dir(port, lib, ":/")
+
+
 def _list_ports():
     return sorted(p.device for p in serial.tools.list_ports.comports())
 
@@ -358,19 +388,10 @@ class _BoardTab(ttk.Frame):
         self._set_action_state("disabled")
         self._status_var.set("Deploying firmware…")
 
-        deploy = os.path.join(project_root, "deploy.sh")
-
         def run():
             try:
-                r = subprocess.run(
-                    ["bash", deploy, self._EXPECTED_BOARD, "-u", port],
-                    capture_output=True, text=True, timeout=120,
-                )
-                if r.returncode != 0:
-                    msg = r.stderr.strip().splitlines()[-1] if r.stderr.strip() else "deploy failed"
-                    self.after(0, lambda: self._status_var.set(f"Firmware error: {msg}"))
-                else:
-                    self.after(0, lambda: self._status_var.set("Firmware deployed."))
+                self._do_deploy(port, project_root)
+                self.after(0, lambda: self._status_var.set("Firmware deployed."))
             except Exception as exc:
                 msg = f"Firmware error: {exc}"
                 self.after(0, lambda: self._status_var.set(msg))
@@ -455,6 +476,9 @@ class _BoardTab(ttk.Frame):
     def _do_write(self):
         raise NotImplementedError
 
+    def _do_deploy(self, port: str, src_root: str):
+        raise NotImplementedError
+
 
 # ── Controller tab ────────────────────────────────────────────────────────────
 
@@ -503,27 +527,36 @@ class ControllerTab(_BoardTab):
         self._x_pin_var.set(str(cfg.get("x_pin", "33")))
         self._y_pin_var.set(str(cfg.get("y_pin", "32")))
 
+    def _write_config_files(self, port):
+        wifi = {
+            "wifi_ssid": self._ssid_var.get(),
+            "wifi_key": self._wifi_key_var.get(),
+        }
+        config: dict[str, object] = {"peer_mac_address": self._peer_mac_var.get()}
+        x = _parse_pin(self._x_pin_var.get(), "X Axis Pin")
+        y = _parse_pin(self._y_pin_var.get(), "Y Axis Pin")
+        if x is not None:
+            config["x_pin"] = x
+        if y is not None:
+            config["y_pin"] = y
+        _write_to_device(port, "wifi.json", json.dumps(wifi, indent=2))
+        _write_to_device(port, "config.json", json.dumps({**wifi, **config}, indent=2))
+
     def _do_write(self):
         port = self._port_var.get()
         self.after(0, lambda: self._status_var.set("Writing to device…"))
         try:
-            wifi = {
-                "wifi_ssid": self._ssid_var.get(),
-                "wifi_key": self._wifi_key_var.get(),
-            }
-            config: dict[str, object] = {"peer_mac_address": self._peer_mac_var.get()}
-            x = _parse_pin(self._x_pin_var.get(), "X Axis Pin")
-            y = _parse_pin(self._y_pin_var.get(), "Y Axis Pin")
-            if x is not None:
-                config["x_pin"] = x
-            if y is not None:
-                config["y_pin"] = y
-            _write_to_device(port, "wifi.json", json.dumps(wifi, indent=2))
-            _write_to_device(port, "config.json", json.dumps({**wifi, **config}, indent=2))
+            self._write_config_files(port)
             self.after(0, lambda: self._status_var.set("Write complete."))
         except Exception as exc:
             msg = f"Write error: {exc}"
             self.after(0, lambda: self._status_var.set(msg))
+
+    def _do_deploy(self, port, src_root):
+        board_dir = os.path.join(src_root, "src", "controller")
+        _deploy_shared(port, os.path.join(src_root, "src"))
+        _cp(port, os.path.join(board_dir, "main.py"), ":/main.py")
+        self._write_config_files(port)
 
 
 # ── Robot tab ─────────────────────────────────────────────────────────────────
@@ -615,31 +648,42 @@ class RobotTab(_BoardTab):
             }
             self._build_motor_pins(saved=saved)
 
+    def _write_config_files(self, port):
+        wifi = {
+            "wifi_ssid": self._ssid_var.get(),
+            "wifi_key": self._wifi_key_var.get(),
+        }
+        config = {"peer_mac_address": self._peer_mac_var.get()}
+        mecanum = {}
+        for motor, vars_dict in self._motor_vars.items():
+            entry = {}
+            for field in ("pin1", "pin2", "enable_pin"):
+                v = _parse_pin(vars_dict[field].get(), f"{motor} {field}")
+                if v is not None:
+                    entry[field] = v
+            mecanum[motor] = entry
+        _write_to_device(port, "wifi.json", json.dumps(wifi, indent=2))
+        _write_to_device(port, "config.json", json.dumps({**wifi, **config}, indent=2))
+        _write_to_device(port, "mecanum.json", json.dumps(mecanum, indent=2))
+
     def _do_write(self):
         port = self._port_var.get()
         self.after(0, lambda: self._status_var.set("Writing to device…"))
         try:
-            wifi = {
-                "wifi_ssid": self._ssid_var.get(),
-                "wifi_key": self._wifi_key_var.get(),
-            }
-            config = {"peer_mac_address": self._peer_mac_var.get()}
-            mecanum = {}
-            for motor, vars_dict in self._motor_vars.items():
-                entry = {}
-                for field in ("pin1", "pin2", "enable_pin"):
-                    v = _parse_pin(vars_dict[field].get(), f"{motor} {field}")
-                    if v is not None:
-                        entry[field] = v
-                mecanum[motor] = entry
-
-            _write_to_device(port, "wifi.json", json.dumps(wifi, indent=2))
-            _write_to_device(port, "config.json", json.dumps({**wifi, **config}, indent=2))
-            _write_to_device(port, "mecanum.json", json.dumps(mecanum, indent=2))
+            self._write_config_files(port)
             self.after(0, lambda: self._status_var.set("Write complete."))
         except Exception as exc:
             msg = f"Write error: {exc}"
             self.after(0, lambda: self._status_var.set(msg))
+
+    def _do_deploy(self, port, src_root):
+        board_dir = os.path.join(src_root, "src", "robot")
+        _deploy_shared(port, os.path.join(src_root, "src"))
+        _cp(port, os.path.join(board_dir, "main.py"), ":/main.py")
+        lib = os.path.join(board_dir, "lib")
+        if os.path.isdir(lib):
+            _cp_dir(port, lib, ":/")
+        self._write_config_files(port)
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
