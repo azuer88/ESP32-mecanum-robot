@@ -90,7 +90,7 @@ def recover_board(port: str | None = None) -> str:
     args += ['exec', "import ujson; print(ujson.dumps(ujson.load(open('config.json'))))"]
 
     print("  Reading config.json from device...")
-    result = subprocess.run(args, capture_output=True, text=True)
+    result = subprocess.run(args, capture_output=True, text=True, stdin=subprocess.DEVNULL)
     raw = re.search(r'\{.*\}', result.stdout + result.stderr)
     if not raw:
         die("Could not read config.json from device. Check the connection and try again.")
@@ -122,6 +122,22 @@ def recover_board(port: str | None = None) -> str:
     with open(board_cfg, 'w') as f:
         json.dump(board_keys, f, indent=2)
     print(f"  Saved src/{board}/config.json")
+
+    if board == 'robot':
+        mecanum_args = ['mpremote']
+        if port:
+            mecanum_args += ['connect', port]
+        mecanum_args += ['exec', "import ujson; print(ujson.dumps(ujson.load(open('mecanum.json'))))"]
+        print("  Reading mecanum.json from device...")
+        mecanum_result = subprocess.run(mecanum_args, capture_output=True, text=True)
+        raw_mecanum = re.search(r'\{.*\}', mecanum_result.stdout + mecanum_result.stderr)
+        if raw_mecanum:
+            mecanum_cfg = SCRIPT_DIR / 'src' / 'robot' / 'mecanum.json'
+            with open(mecanum_cfg, 'w') as f:
+                json.dump(json.loads(raw_mecanum.group(0)), f, indent=2)
+            print("  Saved src/robot/mecanum.json")
+        else:
+            print("  WARNING: mecanum.json not found on device — src/robot/mecanum.json not written")
 
     return board
 
