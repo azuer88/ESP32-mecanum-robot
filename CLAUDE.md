@@ -43,6 +43,19 @@ mpremote run main.py
 mpremote
 ```
 
+## Configurator GUI
+
+`src/configurator/configurator.py` is a tkinter desktop app for configuring and flashing boards over USB. It uses `mpremote`, `esptool`, and `pyserial` — install via `src/configurator/requirements.txt`.
+
+Three tabs:
+- **Controller / Robot** — Read Device (populates all fields + device info), Write Config (writes json files to device), Write Firmware (runs `deploy.sh`; checks `peer_mac_address` pre-flight and auto-fills from the other tab's known MAC if missing or warns on mismatch). **Read both devices before writing firmware** so the app can verify/correct the peer MAC on each side.
+- **Flash** — firmware dropdown (local `.bin` files in `provision/` + fetchable from micropython.org), Download, Flash MicroPython (erase + write + deploy skel), Deploy Skeleton (skel only, clears existing files first)
+
+WiFi SSID/password are shared `tk.StringVar` instances between Controller and Robot tabs — reading either board fills the other. Hardware MACs are similarly tracked cross-tab to support the peer MAC pre-flight check.
+
+Run: `python3 src/configurator/configurator.py`
+Build Windows exe: `cd src/configurator && build.bat`
+
 ## Provisioning a bare board
 
 `provision/provision.sh` flashes MicroPython and deploys a WebREPL baseline — **not** the project firmware. Run project deploy commands afterwards.

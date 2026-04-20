@@ -5,3 +5,7 @@ src/wifi.json
 .idea/
 npm-debug.log
 .wezterm-startup
+.mcp.json
+src/configurator/dist/
+src/configurator/build/
+src/configurator/*.spec

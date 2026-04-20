@@ -1,0 +1,4 @@
+pyserial>=3.5
+mpremote>=1.22.0
+esptool>=4.0
+pyinstaller>=6.0

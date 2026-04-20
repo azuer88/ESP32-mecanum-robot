@@ -479,6 +479,42 @@ The joystick button toggles between **rotate mode** (X axis turns the robot) and
 
 ---
 
+## Configurator GUI
+
+`src/configurator/` is a tkinter desktop app for configuring boards without touching the command line. It connects over USB serial using `mpremote`.
+
+```bash
+cd src/configurator
+pip install -r requirements.txt
+python3 configurator.py
+```
+
+Build a Windows executable on a Windows machine:
+
+```bat
+cd src\configurator
+build.bat
+```
+
+### Tabs
+
+**Controller / Robot** — per-board configuration:
+- **Read Device** — connects to the board, populates device info (MAC, config status, WiFi) and all input fields
+- **Write Config** — writes `wifi.json`, `config.json`, and (robot only) `mecanum.json` to the board
+- **Write Controller/Robot Firmware** — runs `deploy.sh` for that board; performs a pre-flight check on `peer_mac_address` before deploying:
+  - If empty but the peer device was previously read, the MAC is applied automatically
+  - If it mismatches the peer's known MAC, a warning is shown
+- WiFi SSID and password are shared between both tabs — reading either board fills in the other tab's WiFi fields
+
+> **Recommended workflow before writing firmware:** connect each board in turn and click **Read Device** on its tab before deploying. This lets the app verify that each board's `peer_mac_address` points to the correct device and auto-correct it if not. Deploying without reading both devices first means the app cannot catch a mismatched or missing peer MAC.
+
+**Flash** — MicroPython firmware management:
+- Scans `provision/` for local `.bin` files
+- **Fetch Available Online** — fetches the firmware list from micropython.org and adds downloadable versions to the dropdown
+- **Download** — saves the selected online firmware to `provision/`
+- **Flash MicroPython** — erases flash, writes firmware, then deploys skeleton files from `provision/skel/`
+- **Deploy Skeleton** — copies skeleton files only (no flash); removes existing files first
+
 ## Repository Layout
 
 ```
@@ -508,6 +544,11 @@ src/
   controller/
     main.py           # asyncio entry point
     config.json.example
+  configurator/
+    configurator.py   # tkinter GUI app
+    requirements.txt  # pyserial, mpremote, esptool, pyinstaller
+    build.sh          # Linux/macOS launcher builder
+    build.bat         # Windows .exe builder (PyInstaller)
 ```
 
 ---
